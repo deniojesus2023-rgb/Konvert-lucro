@@ -4,13 +4,10 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
 }
 
-/** A clean, discreet card: subtle border, very light shadow, no gradients. */
+/** A discreet, line-bounded block — thin border, no shadow, no fill. */
 export function Card({ children, className, ...rest }: CardProps) {
   return (
-    <div
-      className={`rounded-2xl border border-blue-light bg-white p-6 shadow-[0_1px_2px_rgba(11,31,58,0.06)] ${className ?? ""}`}
-      {...rest}
-    >
+    <div className={`rounded-[8px] border border-line px-5 py-4 ${className ?? ""}`} {...rest}>
       {children}
     </div>
   );

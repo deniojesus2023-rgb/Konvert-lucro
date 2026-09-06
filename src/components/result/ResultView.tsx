@@ -2,7 +2,6 @@ import type { Cents } from "@/domain/money/cents";
 import type { Metric, ProfitResult } from "@/domain/diagnostic/types";
 import { formatCurrencyDisplay, formatWholeReais } from "@/lib/client/currency";
 import { reasonLabel } from "@/lib/client/metric-reasons";
-import { Card } from "@/components/ui/Card";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { BlindSpotList } from "@/components/ui/BlindSpotList";
 import { Logo } from "@/components/ui/Logo";
@@ -28,7 +27,7 @@ export function ResultView({ result }: ResultViewProps) {
   const profitValue = result.profit.status === "available" ? result.profit.value : null;
 
   return (
-    <div className="flex min-h-full flex-col bg-white">
+    <div className="flex min-h-full flex-col bg-canvas">
       <FireFunnelEvent
         event={{
           eventName: "result_viewed",
@@ -36,13 +35,13 @@ export function ResultView({ result }: ResultViewProps) {
         }}
       />
 
-      <header className="border-b border-blue-light px-6 py-4">
-        <div className="mx-auto max-w-3xl">
-          <Logo className="h-7 w-auto" />
+      <header className="border-b border-line px-6 py-4">
+        <div className="mx-auto max-w-2xl">
+          <Logo className="h-6 w-auto" />
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-6 py-10">
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-6 py-10 sm:px-10 sm:py-14">
         {profitAvailable ? (
           <AvailableHeadline profitCents={profitValue as Cents} takeHome={result.takeHomePer100Cents} />
         ) : (
@@ -52,7 +51,7 @@ export function ResultView({ result }: ResultViewProps) {
         {result.hasEstimatedInputs && <EstimateBadge estimatedGroups={result.estimatedGroups} />}
 
         {profitAvailable && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex flex-col">
             <MetricCard
               label="Lucro mensal estimado"
               value={formatCurrencyDisplay(profitValue as number)}
@@ -106,20 +105,20 @@ export function ResultView({ result }: ResultViewProps) {
           </div>
         )}
 
-        {profitAvailable && <GoalCard gapToGoal={result.gapToGoal} />}
+        {profitAvailable && <GoalRow gapToGoal={result.gapToGoal} />}
 
         <TopCostGroups groups={result.topCostGroups} />
 
-        {result.blindSpots.length > 0 && (
-          <Card>
-            <BlindSpotList blindSpots={result.blindSpots} />
-          </Card>
-        )}
+        {result.blindSpots.length > 0 && <BlindSpotList blindSpots={result.blindSpots} />}
 
         <ResultDisclaimer />
-
-        <OfferBridge />
       </main>
+
+      <div className="px-6 sm:px-10">
+        <div className="mx-auto max-w-2xl">
+          <OfferBridge />
+        </div>
+      </div>
     </div>
   );
 }
@@ -127,7 +126,7 @@ export function ResultView({ result }: ResultViewProps) {
 function AvailableHeadline({ profitCents, takeHome }: { profitCents: Cents; takeHome: Metric<number> }) {
   if (profitCents < 0) {
     return (
-      <h1 className="text-2xl font-semibold text-navy sm:text-3xl">
+      <h1 className="text-3xl font-semibold leading-tight text-ink sm:text-4xl">
         Seu delivery teve um resultado negativo estimado de{" "}
         {formatCurrencyDisplay(Math.abs(profitCents))} no período.
       </h1>
@@ -137,7 +136,7 @@ function AvailableHeadline({ profitCents, takeHome }: { profitCents: Cents; take
   const takeHomeText = takeHome.status === "available" ? formatWholeReais(takeHome.value) : "?";
 
   return (
-    <h1 className="text-2xl font-semibold text-navy sm:text-3xl">
+    <h1 className="text-3xl font-semibold leading-tight text-ink sm:text-4xl">
       De cada R$100 vendidos, aproximadamente {takeHomeText} ficam no seu delivery.
     </h1>
   );
@@ -148,55 +147,57 @@ function PartialHeadline({ result }: { result: ProfitResult }) {
   const beforeTaxes = result.profitBeforeTaxes;
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-navy sm:text-3xl">
+    <div className="flex flex-col gap-6">
+      <h1 className="text-3xl font-semibold leading-tight text-ink sm:text-4xl">
         Ainda não dá para estimar seu lucro com segurança.
       </h1>
 
-      {beforeTaxes.status === "available" && (
-        <Card className="border-blue-primary/40">
-          <p className="text-sm text-navy/60">Resultado antes dos impostos</p>
-          <p className="mt-1 text-2xl font-semibold text-navy">
-            {formatCurrencyDisplay(beforeTaxes.value)}
-          </p>
-          <p className="mt-1 text-xs text-navy/50">
-            Este valor ainda não desconta impostos e nunca deve ser lido como lucro final.
-          </p>
-        </Card>
-      )}
-
-      <Card>
-        <p className="text-sm text-navy/60">Saldo antes dos custos não informados</p>
-        <p className="mt-1 text-2xl font-semibold text-navy">
-          {balance.status === "available" ? formatCurrencyDisplay(balance.value) : "Indisponível"}
-        </p>
-        {balance.status === "unavailable" && (
-          <p className="mt-1 text-xs text-navy/50">{unavailableNote(balance)}</p>
+      <div className="flex flex-col">
+        {beforeTaxes.status === "available" && (
+          <div className="border-b border-line py-4">
+            <p className="text-ink-soft">Resultado antes dos impostos</p>
+            <p className="mt-1 text-2xl font-semibold text-ink">
+              {formatCurrencyDisplay(beforeTaxes.value)}
+            </p>
+            <p className="mt-1 text-xs text-ink-faint">
+              Este valor ainda não desconta impostos e nunca deve ser lido como lucro final.
+            </p>
+          </div>
         )}
-      </Card>
+
+        <div className="border-b border-line py-4">
+          <p className="text-ink-soft">Saldo antes dos custos não informados</p>
+          <p className="mt-1 text-2xl font-semibold text-ink">
+            {balance.status === "available" ? formatCurrencyDisplay(balance.value) : "Indisponível"}
+          </p>
+          {balance.status === "unavailable" && (
+            <p className="mt-1 text-xs text-ink-faint">{unavailableNote(balance)}</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
-function GoalCard({ gapToGoal }: { gapToGoal: Metric<Cents> }) {
+function GoalRow({ gapToGoal }: { gapToGoal: Metric<Cents> }) {
   if (gapToGoal.status === "unavailable") {
     return (
-      <Card>
-        <p className="text-sm text-navy/60">Distância para a meta</p>
-        <p className="mt-1 text-navy">{unavailableNote(gapToGoal)}</p>
-      </Card>
+      <div className="border-b border-line py-4">
+        <p className="text-ink-soft">Distância para a meta</p>
+        <p className="mt-1 text-ink">{unavailableNote(gapToGoal)}</p>
+      </div>
     );
   }
 
   const gap = gapToGoal.value;
   return (
-    <Card>
-      <p className="text-sm text-navy/60">Meta</p>
-      <p className="mt-1 text-xl font-semibold text-navy">
+    <div className="border-b border-line py-4">
+      <p className="text-ink-soft">Meta</p>
+      <p className="mt-1 text-xl font-semibold text-ink">
         {gap < 0
           ? `Você superou sua meta em ${formatCurrencyDisplay(Math.abs(gap))}.`
           : `Faltam ${formatCurrencyDisplay(gap)} para atingir sua meta.`}
       </p>
-    </Card>
+    </div>
   );
 }

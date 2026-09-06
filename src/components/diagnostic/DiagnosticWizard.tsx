@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   ApiRequestError,
@@ -21,9 +21,14 @@ import { ERROR_MESSAGES } from "@/lib/client/error-messages";
 import { CONSENT_TEXT_VERSION } from "@/lib/config/consent";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
-import { WizardShell } from "./WizardShell";
+import { ChoiceGroup } from "@/components/ui/ChoiceGroup";
+import { DiagnosticScreen } from "./DiagnosticScreen";
+import { MonetaryAnswer } from "./MonetaryAnswer";
+import { OrderAnswer } from "./OrderAnswer";
 import { hydrateAnswers, hydrateProfile } from "./hydrate-draft";
 import {
+  DELIVERY_TYPE_OPTIONS,
+  MAIN_CHANNEL_OPTIONS,
   emptyDraftAnswers,
   isMoneyFieldComplete,
   taxesNeedClassification,
@@ -32,13 +37,6 @@ import {
   type ProfileAnswers,
   type TaxClassification,
 } from "./wizard-types";
-import { ProfileStep, PROFILE_STEP_META } from "./steps/ProfileStep";
-import { SalesStep, SALES_STEP_META } from "./steps/SalesStep";
-import { ProductionStep, PRODUCTION_STEP_META } from "./steps/ProductionStep";
-import { FeesStep, FEES_STEP_META } from "./steps/FeesStep";
-import { DeliveryStep, DELIVERY_STEP_META } from "./steps/DeliveryStep";
-import { StructureStep, STRUCTURE_STEP_META } from "./steps/StructureStep";
-import { GoalStep, GOAL_STEP_META } from "./steps/GoalStep";
 import {
   CaptureStep,
   CAPTURE_STEP_META,
@@ -51,6 +49,23 @@ type Phase = "initializing" | "ready" | "error";
 
 const STARTED_AT_STORAGE_KEY = "konvert:raiox:started-at";
 
+const TAX_CLASSIFICATION_OPTIONS: Record<string, TaxClassification> = {
+  "Sim, acompanham as vendas": "variable",
+  "Não, são um valor fixo": "fixed",
+  "Não sei responder": "unclassified",
+};
+
+interface Screen {
+  kicker: string;
+  heading: string;
+  description?: string;
+  footnote?: string;
+  helper?: { summary: string; content: ReactNode };
+  content: ReactNode;
+  complete: boolean;
+  nextPreview?: string;
+}
+
 export function DiagnosticWizard() {
   const router = useRouter();
   const initRef = useRef(false);
@@ -61,6 +76,7 @@ export function DiagnosticWizard() {
   const [diagnosticId, setDiagnosticId] = useState<string | null>(null);
   const [answersVersion, setAnswersVersion] = useState(0);
   const [step, setStep] = useState(1);
+  const [screenIndex, setScreenIndex] = useState(0);
 
   const [answers, setAnswers] = useState<DraftAnswers>(emptyDraftAnswers());
   const [profile, setProfile] = useState<ProfileAnswers>({ deliveryType: null, mainChannel: null });
@@ -71,6 +87,7 @@ export function DiagnosticWizard() {
   const [savedMessageVisible, setSavedMessageVisible] = useState(false);
   const [stepError, setStepError] = useState<string | null>(null);
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
+  const [finalizing, setFinalizing] = useState(false);
 
   // --- Initialization / resume -----------------------------------------
   useEffect(() => {
@@ -100,6 +117,7 @@ export function DiagnosticWizard() {
         setProfile(hydrateProfile(draft));
         setTaxClassification((draft.taxClassification as TaxClassification | null) ?? null);
         setStep(clampStep(stored.step));
+        setScreenIndex(0);
         setPhase("ready");
         return;
       } catch (error) {
@@ -120,6 +138,7 @@ export function DiagnosticWizard() {
       setDiagnosticId(created.id);
       setAnswersVersion(created.answersVersion);
       setStep(1);
+      setScreenIndex(0);
       setPhase("ready");
       try {
         window.sessionStorage.setItem(STARTED_AT_STORAGE_KEY, String(Date.now()));
@@ -140,6 +159,8 @@ export function DiagnosticWizard() {
       diagnosticId,
       metadata: { step },
     });
+    // Only fires once per macro step, matching the server's step model —
+    // sub-screens inside a step aren't separately tracked here.
   }, [phase, step, diagnosticId]);
 
   // --- Recovery from a 409 (stale expectedVersion) ----------------------
@@ -197,6 +218,7 @@ export function DiagnosticWizard() {
       setSavedMessageVisible(true);
       window.setTimeout(() => setSavedMessageVisible(false), 2000);
       setStep(nextStep);
+      setScreenIndex(0);
     } catch (error) {
       if (error instanceof ApiRequestError) {
         if (error.status === 404) {
@@ -224,16 +246,31 @@ export function DiagnosticWizard() {
     }
   }
 
-  function goBack() {
+  function goToNextScreen(screensInStep: number, onLastScreen: () => void) {
+    if (screenIndex < screensInStep - 1) {
+      setStepError(null);
+      setConflictMessage(null);
+      setScreenIndex((current) => current + 1);
+      return;
+    }
+    onLastScreen();
+  }
+
+  function goBack(previousStepScreenCount: number) {
     setStepError(null);
     setConflictMessage(null);
-    setStep((current) => Math.max(1, current - 1));
-    if (diagnosticId) saveDraftRef({ id: diagnosticId, step: Math.max(1, step - 1), answersVersion });
+    if (screenIndex > 0) {
+      setScreenIndex((current) => current - 1);
+      return;
+    }
+    if (step === 1) return;
+    const previousStep = step - 1;
+    setStep(previousStep);
+    setScreenIndex(Math.max(0, previousStepScreenCount - 1));
+    if (diagnosticId) saveDraftRef({ id: diagnosticId, step: previousStep, answersVersion });
   }
 
   // --- Finalize ------------------------------------------------------------
-  const [finalizing, setFinalizing] = useState(false);
-
   async function handleFinalize() {
     if (!diagnosticId) return;
     setStepError(null);
@@ -304,161 +341,376 @@ export function DiagnosticWizard() {
     );
   }
 
-  const stepConfig = getStepConfig(step, {
-    answers,
-    profile,
-    taxClassification,
-    contact,
-  });
+  const screens = buildScreens(step, { answers, profile, taxClassification, contact });
+  const previousStepScreens =
+    step > 1 ? buildScreens(step - 1, { answers, profile, taxClassification, contact }) : [];
+  const current = screens[Math.min(screenIndex, screens.length - 1)];
+  const isLastMacroStep = step === TOTAL_STEPS;
+  const isLastScreenOfStep = screenIndex === screens.length - 1;
+
+  function handleContinue() {
+    if (step === 1) {
+      goToNextScreen(screens.length, () =>
+        void saveCurrentStepAndAdvance({ profile }),
+      );
+      return;
+    }
+    if (step === 2) {
+      goToNextScreen(screens.length, () =>
+        void saveCurrentStepAndAdvance({ answers: { revenue: answers.revenue, orders: answers.orders } }),
+      );
+      return;
+    }
+    if (step === 3) {
+      goToNextScreen(screens.length, () =>
+        void saveCurrentStepAndAdvance({ answers: { cost_production: answers.cost_production } }),
+      );
+      return;
+    }
+    if (step === 4) {
+      goToNextScreen(screens.length, () =>
+        void saveCurrentStepAndAdvance({ answers: { cost_fees: answers.cost_fees } }),
+      );
+      return;
+    }
+    if (step === 5) {
+      goToNextScreen(screens.length, () =>
+        void saveCurrentStepAndAdvance({ answers: { cost_delivery: answers.cost_delivery } }),
+      );
+      return;
+    }
+    if (step === 6) {
+      goToNextScreen(screens.length, () =>
+        void saveCurrentStepAndAdvance({
+          answers: { cost_fixed_structure: answers.cost_fixed_structure, taxes: answers.taxes },
+          taxClassification: taxClassification ?? undefined,
+        }),
+      );
+      return;
+    }
+    if (step === 7) {
+      goToNextScreen(screens.length, () =>
+        void saveCurrentStepAndAdvance({ answers: { goal: answers.goal } }),
+      );
+      return;
+    }
+    void handleFinalize();
+  }
 
   return (
-    <WizardShell
+    <DiagnosticScreen
       step={step}
-      title={stepConfig.title}
-      onBack={step > 1 ? goBack : undefined}
-      onContinue={stepConfig.onContinue}
-      continueLabel={step === TOTAL_STEPS ? "Ver meu resultado" : "Continuar"}
-      continueDisabled={!stepConfig.complete}
-      continueBusy={step === TOTAL_STEPS ? finalizing : saving}
+      kicker={current.kicker}
+      heading={current.heading}
+      description={current.description}
+      footnote={current.footnote}
+      helper={current.helper}
+      onBack={step > 1 || screenIndex > 0 ? () => goBack(previousStepScreens.length) : undefined}
+      onContinue={handleContinue}
+      continueLabel={isLastMacroStep && isLastScreenOfStep ? "Ver meu resultado" : "Continuar"}
+      continueDisabled={!current.complete}
+      continueBusy={isLastMacroStep && isLastScreenOfStep ? finalizing : saving}
+      nextPreview={current.nextPreview}
       saving={saving}
       savedMessageVisible={savedMessageVisible}
       errorMessage={stepError}
       conflictMessage={conflictMessage}
     >
-      {stepConfig.content}
-    </WizardShell>
+      {current.content}
+    </DiagnosticScreen>
   );
 
-  function getStepConfig(
-    current: number,
+  function buildScreens(
+    stepNumber: number,
     state: {
       answers: DraftAnswers;
       profile: ProfileAnswers;
       taxClassification: TaxClassification | null;
       contact: ContactFormState;
     },
-  ): { title: string; content: React.ReactNode; complete: boolean; onContinue: () => void } {
-    switch (current) {
+  ): Screen[] {
+    switch (stepNumber) {
       case 1:
-        return {
-          title: PROFILE_STEP_META.title,
-          content: <ProfileStep profile={state.profile} onChange={setProfile} />,
-          complete: Boolean(state.profile.deliveryType && state.profile.mainChannel),
-          onContinue: () => void saveCurrentStepAndAdvance({ profile: state.profile }),
-        };
+        return [
+          {
+            kicker: "01 / PERFIL",
+            heading: "Qual é o tipo do seu delivery?",
+            description: "Selecione a opção mais próxima do seu negócio.",
+            content: (
+              <ChoiceGroup
+                key="deliveryType"
+                name="deliveryType"
+                label="Escolha uma opção"
+                options={DELIVERY_TYPE_OPTIONS}
+                value={state.profile.deliveryType}
+                onChange={(deliveryType) => setProfile((prev) => ({ ...prev, deliveryType }))}
+              />
+            ),
+            complete: Boolean(state.profile.deliveryType),
+            nextPreview: "A seguir: por onde entram mais pedidos",
+          },
+          {
+            kicker: "01 / PERFIL",
+            heading: "Por onde entram mais pedidos?",
+            description: "Escolha o canal que mais representa suas vendas hoje.",
+            footnote: "Você poderá informar outros canais depois.",
+            content: (
+              <ChoiceGroup
+                key="mainChannel"
+                name="mainChannel"
+                label="Escolha uma opção"
+                options={MAIN_CHANNEL_OPTIONS}
+                value={state.profile.mainChannel}
+                onChange={(mainChannel) => setProfile((prev) => ({ ...prev, mainChannel }))}
+              />
+            ),
+            complete: Boolean(state.profile.mainChannel),
+            nextPreview: "A seguir: faturamento dos últimos 30 dias",
+          },
+        ];
       case 2:
-        return {
-          title: SALES_STEP_META.title,
-          content: (
-            <SalesStep
-              revenue={state.answers.revenue}
-              orders={state.answers.orders}
-              onRevenueChange={(value) => setAnswers((prev) => ({ ...prev, revenue: value }))}
-              onOrdersChange={(value) => setAnswers((prev) => ({ ...prev, orders: value }))}
-            />
-          ),
-          complete:
-            isMoneyFieldComplete(state.answers.revenue) && state.answers.orders !== null,
-          onContinue: () =>
-            void saveCurrentStepAndAdvance({
-              answers: { revenue: state.answers.revenue, orders: state.answers.orders },
-            }),
-        };
+        return [
+          {
+            kicker: "02 / VENDAS",
+            heading: "Quanto seu delivery vendeu?",
+            description: "Nos últimos 30 dias.",
+            footnote:
+              "Informe o valor total cobrado dos clientes, antes das taxas e descontos do aplicativo. Não use somente o valor líquido que caiu na conta.",
+            content: (
+              <MonetaryAnswer
+                key="revenue"
+                id="revenue"
+                label="Faturamento"
+                zeroLabel="Não tive vendas no período"
+                value={state.answers.revenue ?? undefined}
+                onChange={(value) => setAnswers((prev) => ({ ...prev, revenue: value }))}
+              />
+            ),
+            complete: isMoneyFieldComplete(state.answers.revenue),
+            nextPreview: "A seguir: quantidade de pedidos",
+          },
+          {
+            kicker: "02 / VENDAS",
+            heading: "Quantos pedidos você teve?",
+            description: "Nos últimos 30 dias.",
+            footnote: "Use a quantidade total de pedidos, incluindo todos os canais.",
+            helper: {
+              summary: "Onde encontro esse número?",
+              content:
+                "Some os pedidos de todos os canais que você vende: apps de delivery, WhatsApp, Instagram, site próprio, telefone e balcão.",
+            },
+            content: (
+              <OrderAnswer
+                key="orders"
+                id="orders"
+                label="Número de pedidos"
+                note="Pedidos concluídos e cancelados no período"
+                value={state.answers.orders ?? undefined}
+                onChange={(value) => setAnswers((prev) => ({ ...prev, orders: value }))}
+              />
+            ),
+            complete: state.answers.orders !== null,
+            nextPreview: "A seguir: custos de produção",
+          },
+        ];
       case 3:
-        return {
-          title: PRODUCTION_STEP_META.title,
-          content: (
-            <ProductionStep
-              value={state.answers.cost_production}
-              onChange={(value) => setAnswers((prev) => ({ ...prev, cost_production: value }))}
-            />
-          ),
-          complete: isMoneyFieldComplete(state.answers.cost_production),
-          onContinue: () =>
-            void saveCurrentStepAndAdvance({
-              answers: { cost_production: state.answers.cost_production },
-            }),
-        };
+        return [
+          {
+            kicker: "03 / PRODUÇÃO",
+            heading: "Quanto você gastou com produção?",
+            description: "Nos últimos 30 dias.",
+            footnote: "Some ingredientes, bebidas, embalagens e descartáveis usados nos pedidos.",
+            helper: {
+              summary: "O que devo incluir?",
+              content:
+                "Use como aproximação o que foi consumido no período, não necessariamente tudo o que foi comprado para estoque.",
+            },
+            content: (
+              <MonetaryAnswer
+                key="cost_production"
+                id="cost_production"
+                label="Custo de produção"
+                note="Ingredientes e embalagens"
+                zeroLabel="Não tenho esse custo"
+                value={state.answers.cost_production ?? undefined}
+                onChange={(value) => setAnswers((prev) => ({ ...prev, cost_production: value }))}
+              />
+            ),
+            complete: isMoneyFieldComplete(state.answers.cost_production),
+            nextPreview: "A seguir: taxas das vendas",
+          },
+        ];
       case 4:
-        return {
-          title: FEES_STEP_META.title,
-          content: (
-            <FeesStep
-              value={state.answers.cost_fees}
-              onChange={(value) => setAnswers((prev) => ({ ...prev, cost_fees: value }))}
-            />
-          ),
-          complete: isMoneyFieldComplete(state.answers.cost_fees),
-          onContinue: () =>
-            void saveCurrentStepAndAdvance({ answers: { cost_fees: state.answers.cost_fees } }),
-        };
+        return [
+          {
+            kicker: "04 / TAXAS",
+            heading: "Quanto você pagou para vender?",
+            description: "Nos últimos 30 dias.",
+            footnote: "Considere comissões de aplicativos, taxas de pagamento, cupons e descontos.",
+            helper: {
+              summary: "Onde encontro essas taxas?",
+              content:
+                "Cada um desses valores entra uma única vez aqui — não repita comissão ou cupom em nenhuma outra etapa.",
+            },
+            content: (
+              <MonetaryAnswer
+                key="cost_fees"
+                id="cost_fees"
+                label="Taxas das vendas"
+                note="Aplicativos, pagamentos e promoções"
+                zeroLabel="Não tenho esse custo"
+                value={state.answers.cost_fees ?? undefined}
+                onChange={(value) => setAnswers((prev) => ({ ...prev, cost_fees: value }))}
+              />
+            ),
+            complete: isMoneyFieldComplete(state.answers.cost_fees),
+            nextPreview: "A seguir: custos com entregas",
+          },
+        ];
       case 5:
-        return {
-          title: DELIVERY_STEP_META.title,
-          content: (
-            <DeliveryStep
-              value={state.answers.cost_delivery}
-              onChange={(value) => setAnswers((prev) => ({ ...prev, cost_delivery: value }))}
-            />
-          ),
-          complete: isMoneyFieldComplete(state.answers.cost_delivery),
-          onContinue: () =>
-            void saveCurrentStepAndAdvance({
-              answers: { cost_delivery: state.answers.cost_delivery },
-            }),
-        };
+        return [
+          {
+            kicker: "05 / ENTREGAS",
+            heading: "Quanto você gastou com entregas?",
+            description: "Nos últimos 30 dias.",
+            footnote: "Inclua motoboys, empresas terceirizadas, combustível e ajuda de custo.",
+            helper: {
+              summary: "O que devo incluir?",
+              content:
+                "Motoboys próprios, aplicativos de entrega terceirizados, combustível e ajuda de custo pagos pelo estabelecimento.",
+            },
+            content: (
+              <MonetaryAnswer
+                key="cost_delivery"
+                id="cost_delivery"
+                label="Custos com entregas"
+                note="Motoboys, combustível e terceirização"
+                zeroLabel="Não tenho esse custo"
+                value={state.answers.cost_delivery ?? undefined}
+                onChange={(value) => setAnswers((prev) => ({ ...prev, cost_delivery: value }))}
+              />
+            ),
+            complete: isMoneyFieldComplete(state.answers.cost_delivery),
+            nextPreview: "A seguir: custos da estrutura",
+          },
+        ];
       case 6: {
         const needsClassification = taxesNeedClassification(state.answers.taxes);
-        const complete =
-          isMoneyFieldComplete(state.answers.cost_fixed_structure) &&
-          isMoneyFieldComplete(state.answers.taxes) &&
-          (!needsClassification || state.taxClassification !== null);
-        return {
-          title: STRUCTURE_STEP_META.title,
-          content: (
-            <StructureStep
-              fixedStructure={state.answers.cost_fixed_structure}
-              taxes={state.answers.taxes}
-              taxClassification={state.taxClassification}
-              onFixedStructureChange={(value) =>
-                setAnswers((prev) => ({ ...prev, cost_fixed_structure: value }))
-              }
-              onTaxesChange={(value) => setAnswers((prev) => ({ ...prev, taxes: value }))}
-              onTaxClassificationChange={setTaxClassification}
-            />
-          ),
-          complete,
-          onContinue: () =>
-            void saveCurrentStepAndAdvance({
-              answers: {
-                cost_fixed_structure: state.answers.cost_fixed_structure,
-                taxes: state.answers.taxes,
-              },
-              taxClassification: state.taxClassification ?? undefined,
-            }),
-        };
+        const screens: Screen[] = [
+          {
+            kicker: "06 / ESTRUTURA",
+            heading: "Quanto custa manter seu delivery?",
+            description: "Por mês.",
+            footnote: "Some aluguel, equipe, energia, água, internet, sistemas e outras despesas fixas.",
+            helper: {
+              summary: "Quais custos entram aqui?",
+              content: "Aluguel, folha e pró-labore formal, água, energia, internet, sistemas e anúncios.",
+            },
+            content: (
+              <MonetaryAnswer
+                key="cost_fixed_structure"
+                id="cost_fixed_structure"
+                label="Custos da estrutura"
+                note="Despesas fixas mensais"
+                zeroLabel="Não tenho esse custo"
+                value={state.answers.cost_fixed_structure ?? undefined}
+                onChange={(value) => setAnswers((prev) => ({ ...prev, cost_fixed_structure: value }))}
+              />
+            ),
+            complete: isMoneyFieldComplete(state.answers.cost_fixed_structure),
+            nextPreview: "A seguir: impostos",
+          },
+          {
+            kicker: "06 / ESTRUTURA",
+            heading: "Quanto você pagou de impostos?",
+            description: "Nos últimos 30 dias.",
+            footnote: "Informe o total pago ou reservado para impostos do delivery.",
+            helper: {
+              summary: "Posso usar uma estimativa?",
+              content:
+                "Nunca estime por alíquota — use o valor que você realmente pagou ou reservou no período.",
+            },
+            content: (
+              <MonetaryAnswer
+                key="taxes"
+                id="taxes"
+                label="Impostos"
+                note="Tributos sobre vendas e operação"
+                zeroLabel="Não paguei imposto no período"
+                value={state.answers.taxes ?? undefined}
+                onChange={(value) => setAnswers((prev) => ({ ...prev, taxes: value }))}
+              />
+            ),
+            complete: isMoneyFieldComplete(state.answers.taxes),
+            nextPreview: needsClassification
+              ? "A seguir: como seus impostos são calculados"
+              : "A seguir: sua meta de lucro",
+          },
+        ];
+
+        if (needsClassification) {
+          const label = state.taxClassification
+            ? Object.entries(TAX_CLASSIFICATION_OPTIONS).find(([, v]) => v === state.taxClassification)?.[0] ??
+              null
+            : null;
+          screens.push({
+            kicker: "06 / ESTRUTURA",
+            heading: "Se vender mais, seus impostos aumentam?",
+            description: "Essa informação ajuda a calcular seu ponto de equilíbrio corretamente.",
+            footnote: "Se não souber, o restante do diagnóstico continua normalmente.",
+            content: (
+              <ChoiceGroup
+                key="taxClassification"
+                name="taxClassification"
+                label="Escolha a opção mais próxima"
+                options={Object.keys(TAX_CLASSIFICATION_OPTIONS)}
+                value={label}
+                onChange={(chosenLabel) => setTaxClassification(TAX_CLASSIFICATION_OPTIONS[chosenLabel])}
+              />
+            ),
+            complete: state.taxClassification !== null,
+            nextPreview: "A seguir: sua meta de lucro",
+          });
+        }
+
+        return screens;
       }
       case 7:
-        return {
-          title: GOAL_STEP_META.title,
-          content: (
-            <GoalStep
-              value={state.answers.goal}
-              onChange={(value) => setAnswers((prev) => ({ ...prev, goal: value }))}
-            />
-          ),
-          complete: isMoneyFieldComplete(state.answers.goal),
-          onContinue: () =>
-            void saveCurrentStepAndAdvance({ answers: { goal: state.answers.goal } }),
-        };
+        return [
+          {
+            kicker: "07 / META",
+            heading: "Quanto você gostaria que sobrasse?",
+            description: "Por mês.",
+            footnote:
+              "Defina uma meta de lucro para compararmos com o resultado atual. Você poderá mudar essa meta depois.",
+            content: (
+              <MonetaryAnswer
+                key="goal"
+                id="goal"
+                label="Sua meta mensal"
+                note="Valor que você gostaria de ter como lucro"
+                zeroLabel="Prefiro não definir uma meta"
+                value={state.answers.goal ?? undefined}
+                onChange={(value) => setAnswers((prev) => ({ ...prev, goal: value }))}
+                simplified
+              />
+            ),
+            complete: isMoneyFieldComplete(state.answers.goal),
+            nextPreview: "A seguir: abrir seu resultado",
+          },
+        ];
       case 8:
       default:
-        return {
-          title: CAPTURE_STEP_META.title,
-          content: <CaptureStep contact={state.contact} onChange={setContact} />,
-          complete: isContactFormComplete(state.contact),
-          onContinue: () => void handleFinalize(),
-        };
+        return [
+          {
+            kicker: "08 / RESULTADO",
+            heading: CAPTURE_STEP_META.title,
+            description: "Só precisamos dos seus dados para criar o acesso seguro ao resultado.",
+            footnote: "Nenhum cartão será solicitado.",
+            content: <CaptureStep contact={state.contact} onChange={setContact} />,
+            complete: isContactFormComplete(state.contact),
+          },
+        ];
     }
   }
 }

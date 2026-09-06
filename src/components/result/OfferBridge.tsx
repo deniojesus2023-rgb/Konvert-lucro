@@ -3,11 +3,11 @@ import { ReviseButton } from "./ReviseButton";
 
 export function OfferBridge() {
   return (
-    <section className="flex flex-col items-center gap-4 rounded-2xl bg-navy px-6 py-10 text-center">
-      <h2 className="text-2xl font-semibold text-white">
+    <section className="-mx-6 flex flex-col items-center gap-4 bg-ink px-6 py-14 text-center sm:-mx-10 sm:px-10">
+      <h2 className="max-w-xl text-2xl font-semibold text-white sm:text-3xl">
         O diagnóstico é uma fotografia. O seu lucro muda todos os dias.
       </h2>
-      <p className="max-w-lg text-white/80">
+      <p className="max-w-lg text-white/70">
         A Konvert foi pensada para acompanhar vendas, taxas e custos e mostrar como o resultado
         do seu delivery muda ao longo do tempo.
       </p>

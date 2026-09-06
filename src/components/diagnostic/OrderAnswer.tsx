@@ -6,23 +6,18 @@ import {
   emptyOrderUiState,
   orderUiToResponseState,
   responseStateToOrderUi,
-  type OrderUiMode,
 } from "@/lib/client/order-answer";
-
-const MODE_LABELS: Record<OrderUiMode, string> = {
-  exact: "Quantidade exata",
-  unknown: "Não sei",
-  zero: "Não tive pedidos",
-};
+import { AnswerTabs } from "./AnswerTabs";
 
 interface OrderAnswerProps {
   id: string;
   label: string;
+  note?: string;
   value: ResponseState<number> | undefined;
   onChange: (state: ResponseState<number> | null) => void;
 }
 
-export function OrderAnswer({ id, label, value, onChange }: OrderAnswerProps) {
+export function OrderAnswer({ id, label, note, value, onChange }: OrderAnswerProps) {
   const [ui, setUi] = useState(() => responseStateToOrderUi(value));
 
   useEffect(() => {
@@ -30,38 +25,24 @@ export function OrderAnswer({ id, label, value, onChange }: OrderAnswerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ui]);
 
-  const modes: OrderUiMode[] = ["exact", "unknown", "zero"];
-
   return (
-    <fieldset className="flex flex-col gap-4">
-      <legend className="text-base font-semibold text-navy">{label}</legend>
-
-      <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2">
-        {modes.map((mode) => {
-          const selected = ui.mode === mode;
-          return (
-            <button
-              key={mode}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => setUi((prev) => (prev.mode === mode ? prev : emptyOrderUiState(mode)))}
-              className={`min-h-[44px] rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-                selected
-                  ? "border-blue-primary bg-blue-light text-navy"
-                  : "border-blue-light bg-white text-navy/70 hover:border-blue-primary"
-              }`}
-            >
-              {MODE_LABELS[mode]}
-            </button>
-          );
-        })}
-      </div>
+    <div className="flex flex-col gap-6">
+      <AnswerTabs
+        legend="Como você quer responder?"
+        name={`${id}-mode`}
+        value={ui.mode}
+        onChange={(mode) => setUi((prev) => (prev.mode === mode ? prev : emptyOrderUiState(mode)))}
+        options={[
+          { value: "exact", label: "Quantidade exata" },
+          { value: "unknown", label: "Não sei" },
+          { value: "zero", label: "Não tive pedidos" },
+        ]}
+      />
 
       {ui.mode === "exact" && (
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={id} className="text-sm font-medium text-navy">
-            Número de pedidos
+        <div className="flex flex-col gap-2">
+          <label htmlFor={id} className="text-sm text-ink-soft">
+            {label}
           </label>
           <input
             id={id}
@@ -72,10 +53,12 @@ export function OrderAnswer({ id, label, value, onChange }: OrderAnswerProps) {
             value={ui.value}
             onChange={(event) => setUi((prev) => ({ ...prev, value: event.target.value }))}
             placeholder="0"
-            className="min-h-[44px] w-full rounded-xl border border-blue-light bg-white px-4 py-3 text-base text-navy outline-none focus:border-blue-primary"
+            className="border-b border-line-strong bg-transparent pb-2 text-4xl font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-faint transition-colors focus:border-blue-primary sm:text-5xl"
           />
         </div>
       )}
-    </fieldset>
+
+      {note && <p className="text-sm text-ink-soft">{note}</p>}
+    </div>
   );
 }

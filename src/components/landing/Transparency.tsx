@@ -8,13 +8,12 @@ const POINTS = [
 
 export function Transparency() {
   return (
-    <section className="bg-white px-6 py-14">
+    <section className="border-t border-line bg-canvas px-6 py-16">
       <div className="mx-auto max-w-2xl">
-        <h2 className="text-center text-2xl font-semibold text-navy sm:text-3xl">Transparência</h2>
-        <ul className="mt-8 flex flex-col gap-3">
+        <h2 className="text-2xl font-semibold text-ink sm:text-3xl">Transparência</h2>
+        <ul className="mt-8 flex flex-col divide-y divide-line border-t border-line">
           {POINTS.map((point) => (
-            <li key={point} className="flex items-start gap-3 text-navy/80">
-              <span aria-hidden="true" className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-primary" />
+            <li key={point} className="py-4 text-ink-soft">
               {point}
             </li>
           ))}

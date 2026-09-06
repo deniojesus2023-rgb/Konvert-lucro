@@ -11,18 +11,12 @@ const ITEMS = [
 
 export function WhatDiagnosticShows() {
   return (
-    <section className="bg-blue-light/40 px-6 py-14">
+    <section className="border-t border-line bg-canvas px-6 py-16">
       <div className="mx-auto max-w-3xl">
-        <h2 className="text-center text-2xl font-semibold text-navy sm:text-3xl">
-          O que o diagnóstico mostra
-        </h2>
-        <ul className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <h2 className="text-2xl font-semibold text-ink sm:text-3xl">O que o diagnóstico mostra</h2>
+        <ul className="mt-8 grid grid-cols-1 divide-y divide-line border-t border-line sm:grid-cols-2 sm:divide-y-0 sm:gap-x-8">
           {ITEMS.map((item) => (
-            <li
-              key={item}
-              className="flex items-center gap-3 rounded-xl border border-blue-light bg-white px-4 py-3 text-navy/80"
-            >
-              <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-blue-primary" />
+            <li key={item} className="border-line py-3 text-ink-soft sm:border-b">
               {item}
             </li>
           ))}

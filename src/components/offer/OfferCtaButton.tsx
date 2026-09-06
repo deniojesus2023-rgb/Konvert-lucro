@@ -14,12 +14,9 @@ export function OfferCtaButton() {
 
   if (clicked) {
     return (
-      <div
-        role="status"
-        className="rounded-2xl border border-blue-light bg-blue-light/40 p-6 text-center"
-      >
-        <p className="font-semibold text-navy">Interesse registrado!</p>
-        <p className="mt-1 text-sm text-navy/70">
+      <div role="status" className="border-l-2 border-blue-primary py-2 pl-4 text-center sm:text-left">
+        <p className="font-semibold text-ink">Interesse registrado!</p>
+        <p className="mt-1 text-sm text-ink-soft">
           Vamos avisar você assim que o acesso à Konvert estiver disponível.
         </p>
       </div>
@@ -27,7 +24,7 @@ export function OfferCtaButton() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-3 text-center">
       <Button
         onClick={() => {
           sendFunnelEvent({ eventName: "checkout_clicked" });
@@ -36,7 +33,7 @@ export function OfferCtaButton() {
       >
         Quero acompanhar meu lucro
       </Button>
-      <p className="max-w-md text-center text-sm text-navy/60">
+      <p className="max-w-md text-sm text-ink-faint">
         A contratação ainda não está disponível. Ao continuar, você registra interesse no
         lançamento da Konvert.
       </p>

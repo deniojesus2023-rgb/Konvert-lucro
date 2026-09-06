@@ -14,16 +14,15 @@ export function BlindSpotList({ blindSpots }: BlindSpotListProps) {
 
   return (
     <div>
-      <p className="font-medium text-navy">Pontos cegos</p>
-      <ul className="mt-2 flex flex-col gap-1 text-sm text-navy/70">
+      <p className="text-sm font-medium tracking-wide text-blue-primary">Pontos cegos</p>
+      <ul className="mt-3 flex flex-col divide-y divide-line border-t border-line">
         {blindSpots.map((spot) => (
-          <li key={spot.field} className="flex items-center gap-2">
-            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-blue-support" />
+          <li key={spot.field} className="py-3 text-ink">
             {fieldLabel(spot.field)}
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-xs text-navy/60">
+      <p className="mt-3 text-sm text-ink-faint">
         Esses custos precisam ser informados para completar a estimativa.
       </p>
     </div>

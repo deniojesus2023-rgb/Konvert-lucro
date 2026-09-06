@@ -7,6 +7,8 @@ interface CurrencyInputProps {
   onChange: (value: string) => void;
   placeholder?: string;
   error?: string;
+  /** Large editorial numeral style (the primary answer field). Defaults to true. */
+  large?: boolean;
 }
 
 /**
@@ -15,18 +17,26 @@ interface CurrencyInputProps {
  * `src/lib/client/currency.ts` (which wraps the domain's money module) —
  * this component only carries the raw string the user is typing.
  */
-export function CurrencyInput({ id, label, value, onChange, placeholder, error }: CurrencyInputProps) {
+export function CurrencyInput({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  error,
+  large = true,
+}: CurrencyInputProps) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-navy">
+    <div className="flex flex-col gap-2">
+      <label htmlFor={id} className="text-sm text-ink-soft">
         {label}
       </label>
       <div
-        className={`flex min-h-[44px] items-center rounded-xl border bg-white px-4 focus-within:border-blue-primary ${
-          error ? "border-red-400" : "border-blue-light"
+        className={`flex items-baseline gap-2 border-b pb-2 transition-colors focus-within:border-blue-primary ${
+          error ? "border-red-400" : "border-line-strong"
         }`}
       >
-        <span className="mr-1 text-navy/50">R$</span>
+        <span className={`text-ink-faint ${large ? "text-2xl" : "text-base"}`}>R$</span>
         <input
           id={id}
           name={id}
@@ -36,9 +46,11 @@ export function CurrencyInput({ id, label, value, onChange, placeholder, error }
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder ?? "0,00"}
-          className="min-w-0 flex-1 bg-transparent py-3 text-base text-navy outline-none"
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${id}-error` : undefined}
+          className={`min-w-0 flex-1 bg-transparent font-semibold text-ink outline-none placeholder:text-ink-faint placeholder:font-normal ${
+            large ? "text-4xl sm:text-5xl" : "text-xl"
+          }`}
         />
       </div>
       {error && (

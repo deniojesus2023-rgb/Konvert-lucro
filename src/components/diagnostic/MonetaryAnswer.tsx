@@ -10,23 +10,29 @@ import {
   type MonetaryUiMode,
 } from "@/lib/client/monetary-answer";
 import { CurrencyInput } from "@/components/ui/CurrencyInput";
+import { AnswerTabs } from "./AnswerTabs";
 
 const MODE_LABELS: Record<Exclude<MonetaryUiMode, "zero">, string> = {
   exact: "Valor exato",
-  approximate: "Valor aproximado",
-  range: "Informar uma faixa",
+  approximate: "Aproximado",
+  range: "Uma faixa",
   unknown: "Não sei",
 };
 
 interface MonetaryAnswerProps {
   id: string;
   label: string;
-  description?: string;
   note?: string;
   /** e.g. "Não tenho esse custo" / "Não tive vendas no período" / "Não tive pedidos". */
   zeroLabel: string;
   value: ResponseState<Cents> | undefined;
   onChange: (state: ResponseState<Cents> | null) => void;
+  /**
+   * Reduced affordance for fields that don't need estimate nuance (the
+   * profit goal): only an exact value plus a single opt-out link, no
+   * approximate/range/unknown tabs.
+   */
+  simplified?: boolean;
 }
 
 /**
@@ -39,11 +45,11 @@ interface MonetaryAnswerProps {
 export function MonetaryAnswer({
   id,
   label,
-  description,
   note,
   zeroLabel,
   value,
   onChange,
+  simplified = false,
 }: MonetaryAnswerProps) {
   const [ui, setUi] = useState(() => responseStateToMonetaryUi(value));
 
@@ -54,43 +60,30 @@ export function MonetaryAnswer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ui]);
 
-  const modes: MonetaryUiMode[] = ["exact", "approximate", "range", "unknown", "zero"];
-
   return (
-    <fieldset className="flex flex-col gap-4">
-      <legend className="text-lg font-semibold text-navy">{label}</legend>
-      {description && <p className="text-sm text-navy/70">{description}</p>}
-
-      <div
-        role="radiogroup"
-        aria-label={`Como você quer responder: ${label}`}
-        className="flex flex-wrap gap-2"
-      >
-        {modes.map((mode) => {
-          const selected = ui.mode === mode;
-          return (
-            <button
-              key={mode}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => setUi((prev) => (prev.mode === mode ? prev : emptyMonetaryUiState(mode)))}
-              className={`min-h-[44px] rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-                selected
-                  ? "border-blue-primary bg-blue-light text-navy"
-                  : "border-blue-light bg-white text-navy/70 hover:border-blue-primary"
-              }`}
-            >
-              {mode === "zero" ? zeroLabel : MODE_LABELS[mode]}
-            </button>
-          );
-        })}
-      </div>
+    <div className="flex flex-col gap-6">
+      {!simplified && (
+        <AnswerTabs
+          legend="Como você quer responder?"
+          name={`${id}-mode`}
+          value={ui.mode}
+          onChange={(mode) => setUi((prev) => (prev.mode === mode ? prev : emptyMonetaryUiState(mode)))}
+          options={[
+            { value: "exact", label: MODE_LABELS.exact },
+            { value: "approximate", label: MODE_LABELS.approximate },
+            { value: "range", label: MODE_LABELS.range },
+          ]}
+          links={[
+            { value: "unknown", label: "Não sei informar" },
+            { value: "zero", label: zeroLabel },
+          ]}
+        />
+      )}
 
       {ui.mode === "exact" && (
         <CurrencyInput
           id={`${id}-exact`}
-          label="Valor"
+          label={label}
           value={ui.exactValue}
           onChange={(exactValue) => setUi((prev) => ({ ...prev, exactValue }))}
         />
@@ -99,19 +92,20 @@ export function MonetaryAnswer({
       {ui.mode === "approximate" && (
         <CurrencyInput
           id={`${id}-approx`}
-          label="Valor aproximado"
+          label={label}
           value={ui.approximateValue}
           onChange={(approximateValue) => setUi((prev) => ({ ...prev, approximateValue }))}
         />
       )}
 
       {ui.mode === "range" && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <CurrencyInput
             id={`${id}-min`}
             label="De"
             value={ui.rangeMin}
             onChange={(rangeMin) => setUi((prev) => ({ ...prev, rangeMin }))}
+            large={false}
           />
           <CurrencyInput
             id={`${id}-max`}
@@ -119,11 +113,42 @@ export function MonetaryAnswer({
             value={ui.rangeMax}
             onChange={(rangeMax) => setUi((prev) => ({ ...prev, rangeMax }))}
             placeholder="Sem limite"
+            large={false}
           />
         </div>
       )}
 
-      {note && <p className="text-xs text-navy/60">{note}</p>}
-    </fieldset>
+      {note && <p className="text-sm text-ink-soft">{note}</p>}
+
+      {simplified && (
+        <div>
+          <label className="relative cursor-pointer rounded-sm outline-offset-2 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-blue-primary">
+            <input
+              type="radio"
+              name={`${id}-mode`}
+              checked={ui.mode === "zero"}
+              onChange={() => setUi((prev) => (prev.mode === "zero" ? prev : emptyMonetaryUiState("zero")))}
+              className="absolute inset-0 z-10 cursor-pointer opacity-0"
+            />
+            <span
+              className={`text-sm underline decoration-line-strong underline-offset-4 hover:decoration-ink ${
+                ui.mode === "zero" ? "font-medium text-blue-primary decoration-blue-primary" : "text-ink-soft"
+              }`}
+            >
+              {zeroLabel}
+            </span>
+          </label>
+          {ui.mode === "zero" && (
+            <button
+              type="button"
+              onClick={() => setUi(emptyMonetaryUiState("exact"))}
+              className="ml-4 text-sm text-blue-primary underline underline-offset-4"
+            >
+              Informar um valor
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

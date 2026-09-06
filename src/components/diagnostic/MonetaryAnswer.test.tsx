@@ -22,7 +22,7 @@ describe("MonetaryAnswer", () => {
     // Mounts on "exact" mode with an empty field -> incomplete.
     expect(onChange).toHaveBeenLastCalledWith(null);
 
-    await user.type(screen.getByLabelText("Valor"), "5000");
+    await user.type(screen.getByLabelText("Quanto vendeu?"), "5000");
 
     expect(onChange).toHaveBeenLastCalledWith({ kind: "informed", value: 500_000 });
   });
@@ -41,7 +41,7 @@ describe("MonetaryAnswer", () => {
       />,
     );
 
-    await user.click(screen.getByRole("radio", { name: "Não sei" }));
+    await user.click(screen.getByRole("radio", { name: "Não sei informar" }));
 
     expect(onChange).toHaveBeenLastCalledWith({ kind: "unknown" });
   });
@@ -79,7 +79,7 @@ describe("MonetaryAnswer", () => {
       />,
     );
 
-    await user.click(screen.getByRole("radio", { name: "Informar uma faixa" }));
+    await user.click(screen.getByRole("radio", { name: "Uma faixa" }));
     await user.type(screen.getByLabelText("De"), "5000");
 
     expect(onChange).toHaveBeenLastCalledWith({ kind: "range", min: 500_000, max: null });

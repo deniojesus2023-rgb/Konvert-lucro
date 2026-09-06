@@ -17,9 +17,9 @@ export function ErrorState({ message, onRetry, retryLabel = "Tentar de novo" }: 
   return (
     <div
       role="alert"
-      className="flex flex-col items-center gap-4 rounded-2xl border border-red-200 bg-red-50 p-6 text-center"
+      className="flex flex-col items-center gap-4 border-l-2 border-red-400 py-4 pl-4 text-center sm:text-left"
     >
-      <p className="text-navy">{message}</p>
+      <p className="text-ink">{message}</p>
       {onRetry && (
         <Button variant="secondary" onClick={onRetry}>
           {retryLabel}

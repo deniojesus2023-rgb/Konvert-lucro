@@ -12,18 +12,15 @@ export function TopCostGroups({ groups }: TopCostGroupsProps) {
 
   return (
     <div>
-      <p className="font-medium text-navy">Maiores custos</p>
-      <ul className="mt-2 flex flex-col gap-2">
+      <p className="text-sm font-medium tracking-wide text-blue-primary">Maiores custos</p>
+      <ul className="mt-3 flex flex-col divide-y divide-line border-t border-line">
         {groups.map((group) => (
-          <li
-            key={group.group}
-            className="flex items-center justify-between rounded-xl border border-blue-light bg-white px-4 py-3"
-          >
-            <span className="text-navy/80">
+          <li key={group.group} className="flex items-baseline justify-between gap-4 py-3">
+            <span className="text-ink">
               {fieldLabel(group.group)}
               {group.isEstimated && <span className="ml-2 text-xs text-blue-primary">(estimado)</span>}
             </span>
-            <span className="font-semibold text-navy">{formatCurrencyDisplay(group.totalCents)}</span>
+            <span className="font-semibold text-ink">{formatCurrencyDisplay(group.totalCents)}</span>
           </li>
         ))}
       </ul>

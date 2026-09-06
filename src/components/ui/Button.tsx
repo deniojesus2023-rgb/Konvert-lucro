@@ -7,17 +7,17 @@ export type ButtonVariant = "primary" | "secondary" | "ghost";
 export type ButtonSize = "default" | "compact";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-primary disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none";
+  "inline-flex items-center justify-center gap-2 rounded-[8px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-primary disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none";
 
 const SIZES: Record<ButtonSize, string> = {
-  default: "min-h-[44px] px-5 py-3 text-base",
+  default: "min-h-[44px] px-6 py-3 text-base",
   compact: "min-h-[40px] px-4 py-2 text-sm",
 };
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-blue-primary text-white hover:bg-blue-support",
-  secondary: "border border-blue-light bg-white text-navy hover:border-blue-primary",
-  ghost: "bg-transparent text-blue-primary hover:bg-blue-light",
+  primary: "bg-blue-primary text-white hover:bg-[#0f5adb]",
+  secondary: "border border-line-strong bg-transparent text-ink hover:border-ink-faint",
+  ghost: "bg-transparent text-blue-primary underline-offset-4 hover:underline",
 };
 
 interface CommonProps {

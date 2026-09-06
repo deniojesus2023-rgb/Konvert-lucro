@@ -1,31 +1,61 @@
 @import "tailwindcss";
 
 :root {
+  /* Brand blue — actions, progress, selection, key information only. */
   --color-blue-primary: #176bff;
   --color-blue-support: #38a0ff;
-  --color-navy: #0b1f3a;
-  --color-blue-light: #eaf2ff;
+
+  /* Editorial neutrals. */
+  --color-canvas: #fcfcfb;
+  --color-ink: #111827;
+  --color-ink-soft: #4b5563;
+  --color-ink-faint: #9ca3af;
+  --color-line: #e5e7eb;
+  --color-line-strong: #d1d5db;
   --color-white: #ffffff;
 
-  --background: var(--color-white);
-  --foreground: var(--color-navy);
+  /* Legacy aliases kept only where components still reference them. */
+  --color-navy: #111827;
+  --color-blue-light: #eaf2ff;
+
+  --background: var(--color-canvas);
+  --foreground: var(--color-ink);
+
+  --radius-control: 8px;
 }
 
 @theme inline {
   --color-blue-primary: var(--color-blue-primary);
   --color-blue-support: var(--color-blue-support);
+  --color-canvas: var(--color-canvas);
+  --color-ink: var(--color-ink);
+  --color-ink-soft: var(--color-ink-soft);
+  --color-ink-faint: var(--color-ink-faint);
+  --color-line: var(--color-line);
+  --color-line-strong: var(--color-line-strong);
   --color-navy: var(--color-navy);
   --color-blue-light: var(--color-blue-light);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
+  --radius-control: var(--radius-control);
+
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
+    "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
