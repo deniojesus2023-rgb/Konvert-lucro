@@ -1,0 +1,24 @@
+# PostgreSQL usado pelos testes de integração.
+#
+# Este é o caminho preferido (portátil, igual ao de CI). Em ambientes sem
+# daemon do Docker, `pnpm db:test:up` cai automaticamente para um cluster
+# PostgreSQL local — ver scripts/test-db.sh. Nos dois casos os testes rodam
+# contra um PostgreSQL real.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: konvert-test-db
+    environment:
+      POSTGRES_USER: konvert
+      POSTGRES_PASSWORD: konvert
+      POSTGRES_DB: konvert_test
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U konvert -d konvert_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    tmpfs:
+      # Banco descartável: nada precisa sobreviver ao container.
+      - /var/lib/postgresql/data

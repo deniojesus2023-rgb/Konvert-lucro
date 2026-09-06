@@ -30,8 +30,13 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — never commit real credentials
 .env*
+# ...except the template, which carries no secrets
+!.env.example
+
+# local test PostgreSQL cluster + logs (pnpm db:test:up)
+/.tmp/
 
 # vercel
 .vercel
