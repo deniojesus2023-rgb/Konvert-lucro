@@ -4,7 +4,6 @@ import { Hero } from "@/components/landing/Hero";
 import { PainPoints } from "@/components/landing/PainPoints";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { WhatDiagnosticShows } from "@/components/landing/WhatDiagnosticShows";
-import { Transparency } from "@/components/landing/Transparency";
 import { FinalCta } from "@/components/landing/FinalCta";
 import { Footer } from "@/components/landing/Footer";
 
@@ -18,7 +17,6 @@ export default function Home() {
         <PainPoints />
         <HowItWorks />
         <WhatDiagnosticShows />
-        <Transparency />
         <FinalCta />
       </main>
       <Footer />

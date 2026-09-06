@@ -13,11 +13,13 @@ interface OrderAnswerProps {
   id: string;
   label: string;
   note?: string;
+  /** e.g. "Ticket médio estimado · R$50,00" — a read-only derived hint. */
+  hint?: string;
   value: ResponseState<number> | undefined;
   onChange: (state: ResponseState<number> | null) => void;
 }
 
-export function OrderAnswer({ id, label, note, value, onChange }: OrderAnswerProps) {
+export function OrderAnswer({ id, label, note, hint, value, onChange }: OrderAnswerProps) {
   const [ui, setUi] = useState(() => responseStateToOrderUi(value));
 
   useEffect(() => {
@@ -59,6 +61,7 @@ export function OrderAnswer({ id, label, note, value, onChange }: OrderAnswerPro
       )}
 
       {note && <p className="text-sm text-ink-soft">{note}</p>}
+      {hint && ui.mode === "exact" && <p className="text-sm text-ink-soft">{hint}</p>}
     </div>
   );
 }

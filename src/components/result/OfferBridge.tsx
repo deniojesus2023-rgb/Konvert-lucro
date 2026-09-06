@@ -3,21 +3,19 @@ import { ReviseButton } from "./ReviseButton";
 
 export function OfferBridge() {
   return (
-    <section className="-mx-6 flex flex-col items-center gap-4 bg-ink px-6 py-14 text-center sm:-mx-10 sm:px-10">
-      <h2 className="max-w-xl text-2xl font-semibold text-white sm:text-3xl">
-        O diagnóstico é uma fotografia. O seu lucro muda todos os dias.
-      </h2>
-      <p className="max-w-lg text-white/70">
-        A Konvert foi pensada para acompanhar vendas, taxas e custos e mostrar como o resultado
-        do seu delivery muda ao longo do tempo.
-      </p>
-      <p className="font-medium text-white">
-        Descobrir uma vez não impede que o lucro escape amanhã.
-      </p>
-      <Button href="/oferta" className="mt-2">
-        Quero acompanhar meu lucro
-      </Button>
-      <ReviseButton />
+    <section className="-mx-6 flex flex-col gap-4 bg-ink px-6 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-10">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-2xl font-semibold text-white sm:text-3xl">Seu lucro muda todos os dias.</h2>
+        <p className="text-white/70">
+          Acompanhe vendas e custos para perceber desvios antes que eles cresçam.
+        </p>
+      </div>
+      <div className="flex shrink-0 flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-6">
+        <Button href="/oferta">
+          Quero acompanhar meu lucro <span aria-hidden="true">→</span>
+        </Button>
+        <ReviseButton />
+      </div>
     </section>
   );
 }

@@ -83,6 +83,13 @@ export interface ProfitResult {
   readonly gapToGoal: Metric<Cents>;
 
   readonly topCostGroups: readonly CostBucket[];
+  /**
+   * Every resolved cost bucket (never just the top N), in canonical
+   * order (production, fees, delivery, structure, then taxes) — the
+   * source for a full revenue-minus-costs statement. A blind-spot group
+   * simply has no entry here; it never appears as zero.
+   */
+  readonly allCostGroups: readonly CostBucket[];
   readonly blindSpots: readonly BlindSpot[];
   readonly hasEstimatedInputs: boolean;
   readonly estimatedGroups: readonly BlindSpotField[];

@@ -2,9 +2,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
-// ReviseButton (rendered inside OfferBridge) calls useRouter(); outside a
-// real Next.js app router tree that throws, so it's mocked here — these
-// tests are about the result content, not client-side navigation.
+// ReviseButton/ResultNav (rendered via useRevise -> useRouter) live outside
+// a real Next.js app router tree in these tests, which throws — mocked
+// here since these tests are about the result content, not navigation.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
@@ -46,14 +46,12 @@ function renderResult(input: DiagnosticInput) {
 }
 
 describe("ResultView — profit available", () => {
-  it("shows the take-home-per-R$100 headline and the metric cards", () => {
+  it("shows the take-home-per-R$100 headline and the profit/margin figures", () => {
     renderResult(baseInput());
 
-    expect(
-      screen.getByText(/De cada R\$100 vendidos, aproximadamente R\$20 ficam no seu delivery\./),
-    ).toBeInTheDocument();
-    const profitCard = screen.getByText("Lucro mensal estimado").closest("div")!;
-    expect(profitCard.textContent).toContain("R$10.000,00");
+    expect(screen.getByText(/De cada R\$100 vendidos, R\$20 ficaram no seu delivery\./)).toBeInTheDocument();
+    const profitBlock = screen.getByText("Lucro mensal estimado").closest("div")!;
+    expect(profitBlock.textContent).toContain("10.000,00");
     expect(screen.getByText("20,00%")).toBeInTheDocument();
   });
 
@@ -84,14 +82,16 @@ describe("ResultView — loss", () => {
 });
 
 describe("ResultView — goal", () => {
-  it("shows 'superou sua meta' when the goal was already exceeded", () => {
+  it("shows 'superou a meta' when the goal was already exceeded", () => {
     renderResult(baseInput({ goal: informed(5_000) })); // profit R$10.000 > goal R$5.000
-    expect(screen.getByText(/Você superou sua meta em R\$5\.000,00\./)).toBeInTheDocument();
+    const row = screen.getByText("Superou a meta em").closest("div")!;
+    expect(row.textContent).toContain("R$5.000,00");
   });
 
   it("shows how much is missing when the goal wasn't reached yet", () => {
     renderResult(baseInput({ goal: informed(50_000) })); // profit R$10.000 < goal R$50.000
-    expect(screen.getByText(/Faltam R\$40\.000,00 para atingir sua meta\./)).toBeInTheDocument();
+    const row = screen.getByText("Faltam para a meta").closest("div")!;
+    expect(row.textContent).toContain("R$40.000,00");
   });
 });
 
@@ -112,17 +112,15 @@ describe("ResultView — partial result (profit unavailable)", () => {
     expect(screen.getByText("Saldo antes dos custos não informados")).toBeInTheDocument();
     expect(screen.queryByText(/^Lucro mensal estimado$/)).not.toBeInTheDocument();
     // The blind spot is listed, never silently treated as zero.
-    expect(screen.getByText("Pontos cegos")).toBeInTheDocument();
-    expect(screen.getByText("Estrutura e impostos")).toBeInTheDocument();
+    expect(screen.getByText("O que falta informar")).toBeInTheDocument();
+    expect(screen.getByText("Estrutura")).toBeInTheDocument();
   });
 
   it("shows 'resultado antes dos impostos' when only taxes are missing", () => {
     renderResult(baseInput({ taxes: { classification: "variable", state: unknown } }));
 
     expect(screen.getByText("Resultado antes dos impostos")).toBeInTheDocument();
-    expect(
-      screen.getByText(/nunca deve ser lido como lucro final/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/nunca deve ser lido como lucro final/)).toBeInTheDocument();
   });
 });
 
@@ -134,7 +132,7 @@ describe("ResultView — estimated inputs", () => {
       }),
     );
     expect(screen.getByText("Contém valores aproximados")).toBeInTheDocument();
-    expect(screen.getByText(/Faturamento/)).toBeInTheDocument();
+    expect(screen.getByText(/Estas respostas foram aproximadas/)).toBeInTheDocument();
   });
 
   it("does not show the badge when nothing was estimated", () => {
@@ -143,8 +141,8 @@ describe("ResultView — estimated inputs", () => {
   });
 });
 
-describe("ResultView — top costs never include blind spots", () => {
-  it("ranks only resolved groups", () => {
+describe("ResultView — blind spots never join the known-costs statement", () => {
+  it("keeps an unknown cost out of 'O que já sabemos', listed only under 'O que falta informar'", () => {
     renderResult(
       baseInput({
         costs: {
@@ -155,11 +153,8 @@ describe("ResultView — top costs never include blind spots", () => {
         },
       }),
     );
-    expect(screen.getByText("Maiores custos")).toBeInTheDocument();
-    // "Entregas" (delivery) is unknown -> must appear only under Pontos
-    // cegos, never in the Maiores custos ranking.
-    const rankingSection = screen.getByText("Maiores custos").closest("div")!;
-    expect(rankingSection.textContent).not.toContain("Entregas");
-    expect(screen.getByText("Pontos cegos").closest("div")!.textContent).toContain("Entregas");
+    const knownSection = screen.getByText("O que já sabemos").closest("div")!;
+    expect(knownSection.textContent).not.toContain("Entregas");
+    expect(screen.getByText("O que falta informar").closest("div")!.textContent).toContain("Entregas");
   });
 });

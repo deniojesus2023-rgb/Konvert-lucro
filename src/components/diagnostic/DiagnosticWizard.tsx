@@ -18,11 +18,13 @@ import {
   saveDraftRef,
 } from "@/lib/client/draft-storage";
 import { ERROR_MESSAGES } from "@/lib/client/error-messages";
+import { formatCurrencyDisplay } from "@/lib/client/currency";
 import { CONSENT_TEXT_VERSION } from "@/lib/config/consent";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { ChoiceGroup } from "@/components/ui/ChoiceGroup";
 import { DiagnosticScreen } from "./DiagnosticScreen";
+import { ProcessingScreen } from "./ProcessingScreen";
 import { MonetaryAnswer } from "./MonetaryAnswer";
 import { OrderAnswer } from "./OrderAnswer";
 import { hydrateAnswers, hydrateProfile } from "./hydrate-draft";
@@ -311,6 +313,7 @@ export function DiagnosticWizard() {
     } catch (error) {
       if (error instanceof ApiRequestError) {
         if (error.status === 404) {
+          setFinalizing(false);
           await handleSessionExpired();
           return;
         }
@@ -339,6 +342,10 @@ export function DiagnosticWizard() {
         <ErrorState message={fatalError ?? ERROR_MESSAGES.generic} onRetry={() => void init()} />
       </div>
     );
+  }
+
+  if (finalizing) {
+    return <ProcessingScreen />;
   }
 
   const screens = buildScreens(step, { answers, profile, taxClassification, contact });
@@ -434,8 +441,9 @@ export function DiagnosticWizard() {
         return [
           {
             kicker: "01 / PERFIL",
-            heading: "Qual é o tipo do seu delivery?",
-            description: "Selecione a opção mais próxima do seu negócio.",
+            heading: "Que tipo de delivery você administra?",
+            description: "Isso ajuda a comparar seus custos com uma operação parecida.",
+            footnote: "Você poderá alterar essa resposta depois.",
             content: (
               <ChoiceGroup
                 key="deliveryType"
@@ -474,20 +482,25 @@ export function DiagnosticWizard() {
             kicker: "02 / VENDAS",
             heading: "Quanto seu delivery vendeu?",
             description: "Nos últimos 30 dias.",
-            footnote:
-              "Informe o valor total cobrado dos clientes, antes das taxas e descontos do aplicativo. Não use somente o valor líquido que caiu na conta.",
+            footnote: "Informe o valor total dos pedidos, antes das taxas e dos descontos.",
+            helper: {
+              summary: "Onde encontro esse valor?",
+              content:
+                "No relatório de vendas de cada aplicativo, ou na soma dos recebimentos de todos os canais no período.",
+            },
             content: (
               <MonetaryAnswer
                 key="revenue"
                 id="revenue"
-                label="Faturamento"
-                zeroLabel="Não tive vendas no período"
+                label="Faturamento bruto"
+                note="Em reais · todos os canais de venda"
+                zeroLabel="Não tive vendas"
                 value={state.answers.revenue ?? undefined}
                 onChange={(value) => setAnswers((prev) => ({ ...prev, revenue: value }))}
               />
             ),
             complete: isMoneyFieldComplete(state.answers.revenue),
-            nextPreview: "A seguir: quantidade de pedidos",
+            nextPreview: "A seguir: número de pedidos",
           },
           {
             kicker: "02 / VENDAS",
@@ -505,6 +518,7 @@ export function DiagnosticWizard() {
                 id="orders"
                 label="Número de pedidos"
                 note="Pedidos concluídos e cancelados no período"
+                hint={averageTicketHint(state.answers.revenue, state.answers.orders)}
                 value={state.answers.orders ?? undefined}
                 onChange={(value) => setAnswers((prev) => ({ ...prev, orders: value }))}
               />
@@ -531,7 +545,7 @@ export function DiagnosticWizard() {
                 id="cost_production"
                 label="Custo de produção"
                 note="Ingredientes e embalagens"
-                zeroLabel="Não tenho esse custo"
+                zeroLabel="Não tive esse custo"
                 value={state.answers.cost_production ?? undefined}
                 onChange={(value) => setAnswers((prev) => ({ ...prev, cost_production: value }))}
               />
@@ -558,7 +572,7 @@ export function DiagnosticWizard() {
                 id="cost_fees"
                 label="Taxas das vendas"
                 note="Aplicativos, pagamentos e promoções"
-                zeroLabel="Não tenho esse custo"
+                zeroLabel="Não tive esse custo"
                 value={state.answers.cost_fees ?? undefined}
                 onChange={(value) => setAnswers((prev) => ({ ...prev, cost_fees: value }))}
               />
@@ -585,7 +599,7 @@ export function DiagnosticWizard() {
                 id="cost_delivery"
                 label="Custos com entregas"
                 note="Motoboys, combustível e terceirização"
-                zeroLabel="Não tenho esse custo"
+                zeroLabel="Não tive esse custo"
                 value={state.answers.cost_delivery ?? undefined}
                 onChange={(value) => setAnswers((prev) => ({ ...prev, cost_delivery: value }))}
               />
@@ -612,7 +626,7 @@ export function DiagnosticWizard() {
                 id="cost_fixed_structure"
                 label="Custos da estrutura"
                 note="Despesas fixas mensais"
-                zeroLabel="Não tenho esse custo"
+                zeroLabel="Não tive esse custo"
                 value={state.answers.cost_fixed_structure ?? undefined}
                 onChange={(value) => setAnswers((prev) => ({ ...prev, cost_fixed_structure: value }))}
               />
@@ -636,7 +650,7 @@ export function DiagnosticWizard() {
                 id="taxes"
                 label="Impostos"
                 note="Tributos sobre vendas e operação"
-                zeroLabel="Não paguei imposto no período"
+                zeroLabel="Não tive esse custo"
                 value={state.answers.taxes ?? undefined}
                 onChange={(value) => setAnswers((prev) => ({ ...prev, taxes: value }))}
               />
@@ -713,6 +727,21 @@ export function DiagnosticWizard() {
         ];
     }
   }
+}
+
+/**
+ * A read-only hint shown next to the order count once both revenue and
+ * orders have a plain typed value — never a substitute for the real
+ * `Cents`-safe division used in the domain engine, just a rough display.
+ */
+function averageTicketHint(
+  revenue: DraftAnswers["revenue"],
+  orders: DraftAnswers["orders"],
+): string | undefined {
+  if (!revenue || revenue.kind !== "informed") return undefined;
+  if (!orders || orders.kind !== "informed" || orders.value <= 0) return undefined;
+  const averageCents = Math.round(revenue.value / orders.value);
+  return `Ticket médio estimado · ${formatCurrencyDisplay(averageCents)}`;
 }
 
 function clampStep(step: number): number {

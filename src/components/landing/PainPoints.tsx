@@ -1,26 +1,19 @@
-const PAINS = [
-  "Taxas, cupons e comissões espalhadas.",
-  "Custos operacionais que passam despercebidos.",
-  "Decisões tomadas olhando apenas o faturamento.",
-];
-
 export function PainPoints() {
   return (
-    <section className="border-t border-line bg-canvas px-6 py-16">
-      <div className="mx-auto max-w-3xl">
-        <h2 className="text-2xl font-semibold text-ink sm:text-3xl">
-          Faturamento alto não significa lucro alto.
+    <section className="border-t border-line bg-canvas px-6 py-14">
+      <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2 lg:gap-16">
+        <h2 className="text-3xl font-semibold leading-tight text-ink sm:text-4xl">
+          Faturamento alto não garante lucro.
         </h2>
-        <ul className="mt-8 flex flex-col divide-y divide-line border-t border-line">
-          {PAINS.map((pain) => (
-            <li key={pain} className="py-4 text-lg text-ink-soft">
-              {pain}
-            </li>
-          ))}
-        </ul>
-        <p className="mt-8 text-lg font-medium text-ink">
-          Você não precisa vender mais antes de saber se as vendas atuais dão lucro.
-        </p>
+        <div className="flex flex-col gap-4">
+          <p className="text-lg text-ink-soft">
+            Taxas, entrega, produção e estrutura podem consumir a margem sem aparecer no saldo
+            da conta.
+          </p>
+          <a href="#o-que-voce-recebe" className="text-blue-primary hover:underline">
+            Veja o que o diagnóstico mostra <span aria-hidden="true">↓</span>
+          </a>
+        </div>
       </div>
     </section>
   );

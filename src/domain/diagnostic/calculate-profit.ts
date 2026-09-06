@@ -231,6 +231,7 @@ export function calculateProfit(input: DiagnosticInput): ProfitResult {
     breakEvenOrders,
     gapToGoal,
     topCostGroups: topCostBuckets(resolvedCostBuckets),
+    allCostGroups: resolvedCostBuckets,
     blindSpots,
     hasEstimatedInputs: estimatedGroups.length > 0,
     estimatedGroups,
