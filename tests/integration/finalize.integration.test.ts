@@ -154,11 +154,15 @@ describe("finalizing a diagnostic", () => {
     expect(await countRows("diagnostic_results")).toBe(1);
   });
 
-  it("refuses a second finalize that carries a different idempotency key", async () => {
+  it("recovers the same result for the owner even with a different idempotency key", async () => {
+    // Simulates the response never reaching the browser: it reloads and
+    // generates a brand-new idempotencyKey before retrying. The session
+    // cookie alone proves ownership, so the owner must get their result
+    // back rather than being locked out by "already_completed".
     const client = new TestClient();
     const { id, answersVersion } = await seedCompletedAnswers(client);
 
-    await client.finalize(id, {
+    const first = await client.finalize(id, {
       expectedVersion: answersVersion,
       idempotencyKey: idempotencyKey("primeira"),
       contact: VALID_CONTACT,
@@ -170,7 +174,73 @@ describe("finalizing a diagnostic", () => {
       contact: VALID_CONTACT,
     });
 
-    expect(second.status).toBe(409);
+    expect(second.status).toBe(200);
+    expect(second.body.resultToken).toBe(first.body.resultToken);
+    expect(second.body.alreadyFinalized).toBe(true);
+
+    expect(await countRows("leads")).toBe(1);
+    expect(await countRows("consents")).toBe(1);
+    expect(await countRows("diagnostic_results")).toBe(1);
+  });
+
+  it("recovers the result after a lost response, even with a stale expectedVersion and a new key", async () => {
+    // The server committed the transaction but the client never saw the
+    // response. On reload the client only has what it knew *before*
+    // finalizing: the old expectedVersion, plus a freshly generated
+    // idempotencyKey. Because the diagnostic is already completed, the
+    // version check must not even be reached — the owner still gets their
+    // token back.
+    const client = new TestClient();
+    const { id, answersVersion } = await seedCompletedAnswers(client);
+
+    await client.finalize(id, {
+      expectedVersion: answersVersion,
+      idempotencyKey: idempotencyKey("original"),
+      contact: VALID_CONTACT,
+    });
+    const originalToken = (
+      await client.finalize(id, {
+        expectedVersion: answersVersion,
+        idempotencyKey: idempotencyKey("original"),
+        contact: VALID_CONTACT,
+      })
+    ).body.resultToken;
+
+    const recovered = await client.finalize(id, {
+      expectedVersion: answersVersion, // stale: the diagnostic is already completed
+      idempotencyKey: idempotencyKey("apos-reload"),
+      contact: VALID_CONTACT,
+    });
+
+    expect(recovered.status).toBe(200);
+    expect(recovered.body.resultToken).toBe(originalToken);
+    expect(recovered.body.alreadyFinalized).toBe(true);
+
+    expect(await countRows("leads")).toBe(1);
+    expect(await countRows("consents")).toBe(1);
+    expect(await countRows("diagnostic_results")).toBe(1);
+  });
+
+  it("still refuses a different session entirely, even for a completed diagnostic", async () => {
+    const owner = new TestClient();
+    const { id, answersVersion } = await seedCompletedAnswers(owner);
+
+    await owner.finalize(id, {
+      expectedVersion: answersVersion,
+      idempotencyKey: idempotencyKey("dono"),
+      contact: VALID_CONTACT,
+    });
+
+    const attacker = new TestClient();
+    await attacker.createDraft();
+
+    const response = await attacker.finalize(id, {
+      expectedVersion: answersVersion,
+      idempotencyKey: idempotencyKey("invasor2"),
+      contact: VALID_CONTACT,
+    });
+
+    expect(response.status).toBe(404);
     expect(await countRows("leads")).toBe(1);
   });
 

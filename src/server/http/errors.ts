@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 /**
@@ -61,7 +62,17 @@ export function errorResponse(error: ApiError): NextResponse {
 
 /**
  * Wraps a handler so an unexpected throw becomes a generic 500 instead of
- * leaking internals. `ApiError`s pass through with their intended status.
+ * leaking internals. `ApiError`s pass through with their intended status
+ * (they carry only messages this codebase wrote itself, never a driver's).
+ *
+ * An UNEXPECTED error (a bug, a database failure) is a different story:
+ * `error.message` can be a Drizzle/postgres.js message that embeds raw SQL,
+ * bind parameters, a constraint name — anything the failing query touched,
+ * which may well be the contact's name or WhatsApp. `error.stack` can
+ * reveal file paths and internals. Neither ever reaches the client NOR the
+ * log — only a fixed, constant string. A random `correlationId` (no user
+ * data, safe to log and to return) is the only thing that varies, so a
+ * report from the client can still be cross-referenced with the log line.
  */
 export async function handleRoute(
   run: () => Promise<NextResponse>,
@@ -72,10 +83,9 @@ export async function handleRoute(
     if (error instanceof ApiError) {
       return errorResponse(error);
     }
-    // Deliberately opaque to the client. The message is logged without any
-    // request payload, so nothing personal reaches the logs either.
-    console.error("[api] erro não tratado:", error instanceof Error ? error.message : "desconhecido");
-    return errorResponse(new ApiError("internal_error", "Erro interno"));
+    const correlationId = randomUUID();
+    console.error("[api] erro interno não tratado", { correlationId });
+    return errorResponse(new ApiError("internal_error", "Erro interno", { correlationId }));
   }
 }
 

@@ -146,11 +146,23 @@ duplo clique ou um retry de rede devolve **o mesmo token**, sem criar um
 segundo lead, consentimento ou resultado. Qualquer falha no meio faz
 rollback completo: ou existe tudo, ou não existe nada.
 
+Repetir a chamada devolve o mesmo token **mesmo com uma `idempotencyKey`
+diferente da original**, desde que a sessão seja a mesma — isso cobre o
+caso em que o servidor concluiu a transação mas a resposta nunca chegou ao
+navegador (a página recarrega e gera uma chave nova antes de tentar de
+novo). O cookie de sessão já prova a propriedade, então é o que basta:
+travar o dono do lado de fora do próprio resultado seria pior do que
+recuperar. Uma sessão diferente da que criou o diagnóstico continua
+recebendo 404, chave igual ou não.
+
 ### Revisão imutável
 
 Um diagnóstico concluído nunca é reescrito. `POST /revise` cria um rascunho
 **novo**, com as respostas copiadas, `source_diagnostic_id` apontando para o
-anterior e um segredo de sessão novo (o cookie é trocado). Ao finalizar a
+anterior — uma foreign key real para `diagnostics.id` com `ON DELETE
+RESTRICT`, então o PostgreSQL rejeita tanto um UUID de origem inexistente
+quanto a exclusão de um diagnóstico que ainda tem uma revisão apontando
+para ele — e um segredo de sessão novo (o cookie é trocado). Ao finalizar a
 revisão nasce um segundo resultado com token próprio, e o link antigo
 continua resolvendo exatamente para os números antigos — para sempre.
 

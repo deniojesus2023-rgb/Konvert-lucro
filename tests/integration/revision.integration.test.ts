@@ -132,3 +132,72 @@ describe("revising a completed diagnostic", () => {
     expect((await attacker.revise(id)).status).toBe(404);
   });
 });
+
+describe("source_diagnostic_id is a real foreign key", () => {
+  it("a revision pointing at an existing, completed diagnostic is accepted", async () => {
+    const client = new TestClient();
+    const { id: sourceId } = await completeOne(client, "fk-valido");
+
+    const revision = await client.revise(sourceId);
+
+    expect(revision.status).toBe(201);
+
+    const [row] = await db.execute<{ source_diagnostic_id: string }>(
+      sql`SELECT source_diagnostic_id FROM diagnostics WHERE id = ${revision.body.id}`,
+    );
+    expect(row.source_diagnostic_id).toBe(sourceId);
+  });
+
+  it("PostgreSQL itself rejects a source_diagnostic_id that doesn't exist", async () => {
+    const bogusId = "00000000-0000-0000-0000-000000000000";
+    const fakeHash = "0".repeat(64);
+
+    let caught: unknown;
+    try {
+      await db.execute(
+        sql`INSERT INTO diagnostics (draft_session_hash, source_diagnostic_id)
+            VALUES (${fakeHash}, ${bogusId})`,
+      );
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeDefined();
+    // Drizzle wraps the driver error in a DrizzleQueryError; the original
+    // postgres.js error (PostgreSQL's own code 23503,
+    // "foreign_key_violation") is its `cause`. Unwrapped here to prove the
+    // database itself — not just the application — enforces this.
+    const driverError = (caught as { cause?: unknown }).cause ?? caught;
+    expect((driverError as { code?: string }).code).toBe("23503");
+    expect((driverError as { constraint_name?: string }).constraint_name).toBe(
+      "diagnostics_source_diagnostic_id_diagnostics_id_fk",
+    );
+  });
+
+  it("normal revision flow still preserves the previous result untouched", async () => {
+    const client = new TestClient();
+    const { id: sourceId, token: firstToken } = await completeOne(client, "fk-preserva");
+    const before = await new TestClient().publicResult(firstToken);
+
+    const revision = await client.revise(sourceId);
+    const patched = await client.patchAnswers(revision.body.id as string, {
+      expectedVersion: 0,
+      answers: { revenue: { kind: "informed", value: 7_000_000 } },
+    });
+    await client.finalize(revision.body.id as string, {
+      expectedVersion: patched.body.answersVersion as number,
+      idempotencyKey: idempotencyKey("fk-preserva-final"),
+      contact: VALID_CONTACT,
+    });
+
+    const after = await new TestClient().publicResult(firstToken);
+    expect(after.status).toBe(200);
+    expect(after.body).toEqual(before.body);
+
+    const [source] = await db.execute<{ status: string; result_token: string }>(
+      sql`SELECT status, result_token FROM diagnostics WHERE id = ${sourceId}`,
+    );
+    expect(source.status).toBe("completed");
+    expect(source.result_token).toBe(firstToken);
+  });
+});

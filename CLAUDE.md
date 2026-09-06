@@ -38,12 +38,28 @@ usuário são Fase 1C+ — não reintroduza nada disso sem que o escopo mude.
 - Nunca logue: segredo do cookie, token de resultado completo, nome,
   WhatsApp ou payload com dado pessoal. Para correlacionar em log, use
   `tokenFingerprint`.
+- Em `handleRoute` (`src/server/http/errors.ts`), um erro inesperado
+  **nunca** loga `error.message`/`stack`/`cause` — driver do Postgres pode
+  embutir SQL, parâmetros ou dado pessoal na própria mensagem. Loga só a
+  string fixa `"[api] erro interno não tratado"` + um `correlationId`
+  aleatório (`randomUUID()`), devolvido também na resposta para o cliente
+  poder referenciar o log. Não reintroduza `error.message` no log nem na
+  resposta desse branch.
 - Toda escrita revalida no servidor com Zod, mesmo que o navegador já tenha
   validado.
 - `getEnv()` e `getDb()` são lazy de propósito: `pnpm build` precisa passar
   sem banco e sem `.env`.
 - Resultado concluído é imutável: nunca faça `UPDATE` em
   `diagnostic_results`. Refazer = nova revisão (`POST /revise`).
+- `finalizeDiagnostic`: se o diagnóstico já está `completed` e a sessão é
+  válida, devolva o `resultToken` existente **independente** da
+  `idempotencyKey` recebida — é o que recupera o dono depois de uma
+  resposta perdida (reload gera chave nova). Nunca crie lead/consent/result
+  de novo nesse caminho; uma sessão diferente continua batendo em 404 antes
+  de chegar aqui.
+- `diagnostics.source_diagnostic_id` é uma foreign key real
+  (`ON DELETE RESTRICT`) para `diagnostics.id` — não volte a deixá-la como
+  UUID solto.
 
 ## Antes de considerar algo pronto
 

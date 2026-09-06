@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   index,
@@ -63,8 +64,17 @@ export const diagnostics = pgTable(
   "diagnostics",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    /** Points at the completed diagnostic this one is a revision of. */
-    sourceDiagnosticId: uuid("source_diagnostic_id"),
+    /**
+     * Points at the completed diagnostic this one is a revision of.
+     * `onDelete: "restrict"` is deliberate: a diagnostic with a revision
+     * must never be deletable out from under it — the lineage between a
+     * result and the revision that superseded it is permanent history,
+     * not a link to clean up.
+     */
+    sourceDiagnosticId: uuid("source_diagnostic_id").references(
+      (): AnyPgColumn => diagnostics.id,
+      { onDelete: "restrict" },
+    ),
     /** SHA-256 of the edit secret. The secret itself only ever lives in the cookie. */
     draftSessionHash: text("draft_session_hash").notNull(),
     leadId: uuid("lead_id").references(() => leads.id, { onDelete: "set null" }),

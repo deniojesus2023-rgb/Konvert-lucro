@@ -8,6 +8,13 @@
       "when": 1788696974475,
       "tag": "0000_workable_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788699445896,
+      "tag": "0001_premium_forgotten_one",
+      "breakpoints": true
     }
   ]
 }

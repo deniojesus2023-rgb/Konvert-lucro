@@ -37,11 +37,11 @@ nenhuma forma de recuperar diagnósticos digitando o número de novo.
 | `invalid_origin` | 403 | `Origin` presente e diferente de `APP_ORIGIN`. |
 | `validation_failed` | 422 | Zod rejeitou o payload (só caminhos e mensagens, nunca os valores enviados). |
 | `version_conflict` | 409 | `expectedVersion` desatualizado; `details.currentVersion` traz a versão real. |
-| `already_completed` | 409 | Tentou alterar/refinalizar um diagnóstico concluído. |
+| `already_completed` | 409 | Tentou alterar um diagnóstico concluído (PATCH), ou finalizá-lo de novo sem que exista um `resultToken` para recuperar — um caso de inconsistência de dados, não o retry normal (que recebe 200, ver `finalize`). |
 | `not_completed` | 409 | Tentou revisar um diagnóstico ainda em rascunho. |
 | `incomplete_diagnostic` | 422 | Falta alguma etapa; `details.missingFields` lista quais. |
 | `rate_limited` | 429 | Limitador em memória (só desenvolvimento — ver README). |
-| `internal_error` | 500 | Erro inesperado, sem stack trace nem detalhe do banco. |
+| `internal_error` | 500 | Erro inesperado. A resposta e o log só carregam uma mensagem fixa e um `details.correlationId` aleatório para correlacionar os dois — nunca a mensagem original, stack, causa, SQL ou dado do usuário (que podem estar embutidos no erro de um driver). |
 
 ## Rotas
 
@@ -149,9 +149,17 @@ resultado.
 { "resultToken": "…43 chars…", "resultPath": "/raio-x/resultado/…", "alreadyFinalized": false }
 ```
 
-Repetir a chamada com a **mesma** `idempotencyKey` devolve o mesmo token
-com `alreadyFinalized: true`, sem criar um segundo lead, consentimento ou
-resultado. Uma chave diferente sobre um diagnóstico já concluído dá 409.
+Repetir a chamada devolve o mesmo token com `alreadyFinalized: true`, sem
+criar um segundo lead, consentimento ou resultado — **mesmo que a
+`idempotencyKey` seja diferente da original**. Isso é proposital: se a
+transação foi confirmada no servidor mas a resposta não chegou ao
+navegador (conexão caiu, página recarregou), o cliente só tem, na
+tentativa seguinte, uma `idempotencyKey` nova que acabou de gerar. Como o
+cookie de sessão já prova que quem está chamando é o dono do diagnóstico,
+isso basta para devolver o `resultToken` existente — a alternativa seria
+travar o próprio dono do lado de fora do resultado dele. Uma sessão
+diferente da que criou o diagnóstico continua recebendo 404, chave igual
+ou não.
 
 ---
 
@@ -186,7 +194,10 @@ Abre uma revisão de um diagnóstico concluído. Exige a sessão dele.
 ```
 
 Cria um rascunho novo com as respostas copiadas, aponta
-`source_diagnostic_id` para o anterior e **troca o cookie** pelo segredo do
-novo rascunho. O resultado anterior e o link dele continuam válidos e
-inalterados para sempre; ao finalizar a revisão nasce um segundo resultado,
+`source_diagnostic_id` para o anterior (foreign key real para
+`diagnostics.id`, `ON DELETE RESTRICT` — o PostgreSQL rejeita tanto um
+UUID que não existe quanto apagar um diagnóstico que ainda tem revisão) e
+**troca o cookie** pelo segredo do novo rascunho. O resultado anterior e o
+link dele continuam válidos e inalterados para sempre; ao finalizar a
+revisão nasce um segundo resultado,
 com token próprio.

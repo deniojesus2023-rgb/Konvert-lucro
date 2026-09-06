@@ -1,0 +1,1 @@
+ALTER TABLE "diagnostics" ADD CONSTRAINT "diagnostics_source_diagnostic_id_diagnostics_id_fk" FOREIGN KEY ("source_diagnostic_id") REFERENCES "public"."diagnostics"("id") ON DELETE restrict ON UPDATE no action;

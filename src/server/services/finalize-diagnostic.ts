@@ -29,9 +29,19 @@ export interface FinalizeOutcome {
  * Concurrency and retries are handled by two mechanisms working together:
  * `SELECT ... FOR UPDATE` serializes simultaneous calls on the same
  * diagnostic, and `finalize_idempotency_key` (UNIQUE) makes a replay
- * recognizable. A double click therefore doesn't duplicate anything: the
- * second call finds the diagnostic already completed under the same key
- * and returns the same token.
+ * recognizable so two overlapping finalize calls collapse into one write.
+ *
+ * Recovery from an already-completed diagnostic is deliberately broader
+ * than "same idempotencyKey": if the server committed the transaction but
+ * the response never reached the browser (dropped connection, reload), the
+ * client's *next* call — after a page reload — carries a brand-new
+ * `idempotencyKey` it just generated. The session cookie already proves
+ * this caller is the diagnostic's owner (`assertSessionOwns` above), so
+ * that alone is enough to hand back the existing `resultToken` instead of
+ * leaving the owner locked out of their own result. This never creates a
+ * second lead/consent/result — the diagnostic is already completed, so the
+ * write path below never runs — and a different session still gets 404
+ * from `assertSessionOwns` before reaching this check at all.
  */
 export async function finalizeDiagnostic(
   id: string,
@@ -45,12 +55,11 @@ export async function finalizeDiagnostic(
     const diagnostic = assertSessionOwns(await findByIdForUpdate(tx, id), sessionSecret);
 
     if (diagnostic.status === "completed") {
-      if (
-        diagnostic.finalizeIdempotencyKey === payload.idempotencyKey &&
-        diagnostic.resultToken
-      ) {
+      if (diagnostic.resultToken) {
         return { resultToken: diagnostic.resultToken, alreadyFinalized: true };
       }
+      // Completed but somehow without a token would be a data-integrity
+      // bug, not a normal retry — surface it rather than recovering silently.
       throw new ApiError(
         "already_completed",
         "Este diagnóstico já foi concluído. Crie uma revisão para refazê-lo.",
