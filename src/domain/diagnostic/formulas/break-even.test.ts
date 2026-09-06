@@ -11,8 +11,8 @@ describe("computeBreakEven", () => {
       ordersValue: 1000,
     });
 
-    expect(result.revenue).toEqual({ status: "confirmed", value: 25_000_00 });
-    expect(result.orders).toEqual({ status: "confirmed", value: 500 });
+    expect(result.revenue).toEqual({ status: "available", value: 25_000_00 });
+    expect(result.orders).toEqual({ status: "available", value: 500 });
   });
 
   it("returns break-even revenue even when orders are unknown", () => {
@@ -23,7 +23,7 @@ describe("computeBreakEven", () => {
       ordersValue: null,
     });
 
-    expect(result.revenue).toEqual({ status: "confirmed", value: 25_000_00 });
+    expect(result.revenue).toEqual({ status: "available", value: 25_000_00 });
     expect(result.orders).toEqual({ status: "unavailable", reason: "missing_orders" });
   });
 
@@ -78,7 +78,7 @@ describe("computeBreakEven", () => {
     // contribution = 100_00 - 40_00 = 60_00
     // breakEvenOrders = ceil(fixedCosts * orders / contribution) = ceil(2100 * 7 / 6000)
     //                 = ceil(14700 / 6000) = ceil(2.45) = 3
-    expect(result.orders).toEqual({ status: "confirmed", value: 3 });
+    expect(result.orders).toEqual({ status: "available", value: 3 });
   });
 
   it("variable-tax scenario matches R$31.250 / 625 orders", () => {
@@ -89,8 +89,8 @@ describe("computeBreakEven", () => {
       ordersValue: 1000,
     });
 
-    expect(result.revenue).toEqual({ status: "confirmed", value: 31_250_00 });
-    expect(result.orders).toEqual({ status: "confirmed", value: 625 });
+    expect(result.revenue).toEqual({ status: "available", value: 31_250_00 });
+    expect(result.orders).toEqual({ status: "available", value: 625 });
   });
 
   it("fixed-tax scenario matches R$35.000 / 700 orders", () => {
@@ -101,7 +101,35 @@ describe("computeBreakEven", () => {
       ordersValue: 1000,
     });
 
-    expect(result.revenue).toEqual({ status: "confirmed", value: 35_000_00 });
-    expect(result.orders).toEqual({ status: "confirmed", value: 700 });
+    expect(result.revenue).toEqual({ status: "available", value: 35_000_00 });
+    expect(result.orders).toEqual({ status: "available", value: 700 });
+  });
+
+  it("mandatory regression: rounds break-even revenue UP to the next cent", () => {
+    // revenue 10.000, variable costs 7.000, fixed costs 100 (all in cents)
+    // contribution = 3.000; fixedCosts*revenue/contribution = 1_000_000/3_000 = 333,333... -> 334
+    const result = computeBreakEven({
+      revenueCents: toCents(10_000),
+      variableCostsCents: toCents(7_000),
+      fixedCostsCents: toCents(100),
+      ordersValue: null,
+    });
+
+    expect(result.revenue).toEqual({ status: "available", value: 334 });
+  });
+
+  it("mandatory regression: an overflowing break-even revenue does not take break-even orders down with it", () => {
+    // A near-zero contribution margin (1 cent) blows break-even revenue past
+    // Number.MAX_SAFE_INTEGER, but the order-count figure stays comfortably
+    // inside safe-integer range and must still be reported.
+    const result = computeBreakEven({
+      revenueCents: toCents(1_000_000_000),
+      variableCostsCents: toCents(999_999_999),
+      fixedCostsCents: toCents(1_000_000_000),
+      ordersValue: 1000,
+    });
+
+    expect(result.revenue).toEqual({ status: "unavailable", reason: "exceeds_safe_range" });
+    expect(result.orders).toEqual({ status: "available", value: 1_000_000_000_000 });
   });
 });

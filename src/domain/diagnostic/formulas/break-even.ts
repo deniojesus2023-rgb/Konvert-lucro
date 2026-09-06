@@ -1,5 +1,5 @@
 import { toDerivedCents, type Cents } from "../../money/cents";
-import { mulDivCeil, mulDivRound, subtractCents } from "../../money/arithmetic";
+import { computeOrOverflow, mulDivCeil, subtractCents } from "../../money/arithmetic";
 import type { Metric } from "../types";
 
 export interface BreakEvenInputs {
@@ -25,6 +25,12 @@ export interface BreakEvenResult {
  * Both break-even figures assume the sales mix and the cost structure of
  * the period stay constant going forward — a simplifying hypothesis, not
  * a prediction.
+ *
+ * Revenue and orders are computed independently: a pathologically thin
+ * contribution margin can push the break-even *revenue* past
+ * `Number.MAX_SAFE_INTEGER` while the break-even *order count* stays well
+ * within range (or vice versa). One overflowing must never take the other
+ * down with it.
  */
 export function computeBreakEven(inputs: BreakEvenInputs): BreakEvenResult {
   const contributionCents = subtractCents(
@@ -39,25 +45,54 @@ export function computeBreakEven(inputs: BreakEvenInputs): BreakEvenResult {
     };
   }
 
-  const breakEvenRevenueCents = toDerivedCents(
-    mulDivRound(inputs.fixedCostsCents, inputs.revenueCents, contributionCents),
+  return {
+    revenue: computeBreakEvenRevenue(
+      inputs.fixedCostsCents,
+      inputs.revenueCents,
+      contributionCents,
+    ),
+    orders: computeBreakEvenOrders(
+      inputs.fixedCostsCents,
+      inputs.ordersValue,
+      contributionCents,
+    ),
+  };
+}
+
+function computeBreakEvenRevenue(
+  fixedCostsCents: Cents,
+  revenueCents: Cents,
+  contributionCents: Cents,
+): Metric<Cents> {
+  // Rounds UP to the next cent: undershooting the break-even point (e.g.
+  // rounding 333,33 down to 333) would tell the owner they're already
+  // safe one cent before they actually are.
+  const result = computeOrOverflow(() =>
+    toDerivedCents(mulDivCeil(fixedCostsCents, revenueCents, contributionCents)),
   );
+  if (!result.ok) {
+    return { status: "unavailable", reason: "exceeds_safe_range" };
+  }
+  return { status: "available", value: result.value };
+}
 
-  const revenue: Metric<Cents> = { status: "confirmed", value: breakEvenRevenueCents };
-
-  if (inputs.ordersValue === null) {
-    return { revenue, orders: { status: "unavailable", reason: "missing_orders" } };
+function computeBreakEvenOrders(
+  fixedCostsCents: Cents,
+  ordersValue: number | null,
+  contributionCents: Cents,
+): Metric<number> {
+  if (ordersValue === null) {
+    return { status: "unavailable", reason: "missing_orders" };
+  }
+  if (ordersValue === 0) {
+    return { status: "unavailable", reason: "zero_orders" };
   }
 
-  if (inputs.ordersValue === 0) {
-    return { revenue, orders: { status: "unavailable", reason: "zero_orders" } };
-  }
-
-  const breakEvenOrders = mulDivCeil(
-    inputs.fixedCostsCents,
-    inputs.ordersValue,
-    contributionCents,
+  const result = computeOrOverflow(() =>
+    mulDivCeil(fixedCostsCents, ordersValue, contributionCents),
   );
-
-  return { revenue, orders: { status: "confirmed", value: breakEvenOrders } };
+  if (!result.ok) {
+    return { status: "unavailable", reason: "exceeds_safe_range" };
+  }
+  return { status: "available", value: result.value };
 }

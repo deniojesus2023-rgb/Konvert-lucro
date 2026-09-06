@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { toCents, type Cents } from "../money/cents";
 import { calculateProfit } from "./calculate-profit";
-import { estimateFromRange, type ResponseState } from "./response-state";
+import { estimateFromRange, estimateTyped, type ResponseState } from "./response-state";
 import type { TaxClassification } from "./constants";
 import type { DiagnosticInput } from "./types";
 
@@ -40,27 +40,27 @@ describe("calculateProfit — mandatory base scenario", () => {
   const result = calculateProfit(baseInput({ goal: informed(5_000) }));
 
   it("profit: R$10.000", () => {
-    expect(result.profit).toEqual({ status: "confirmed", value: 1_000_000 });
+    expect(result.profit).toEqual({ status: "available", value: 1_000_000 });
   });
 
   it("margin: 20% (2000 bps)", () => {
-    expect(result.marginBps).toEqual({ status: "confirmed", value: 2000 });
+    expect(result.marginBps).toEqual({ status: "available", value: 2000 });
   });
 
   it("profit per order: R$10", () => {
-    expect(result.profitPerOrder).toEqual({ status: "confirmed", value: 1000 });
+    expect(result.profitPerOrder).toEqual({ status: "available", value: 1000 });
   });
 
   it("take-home per R$100: R$20, i.e. 2000 cents (not 20)", () => {
-    expect(result.takeHomePer100Cents).toEqual({ status: "confirmed", value: 2000 });
+    expect(result.takeHomePer100Cents).toEqual({ status: "available", value: 2000 });
   });
 
   it("break-even revenue: R$25.000", () => {
-    expect(result.breakEvenRevenue).toEqual({ status: "confirmed", value: 2_500_000 });
+    expect(result.breakEvenRevenue).toEqual({ status: "available", value: 2_500_000 });
   });
 
   it("break-even orders: 500", () => {
-    expect(result.breakEvenOrders).toEqual({ status: "confirmed", value: 500 });
+    expect(result.breakEvenOrders).toEqual({ status: "available", value: 500 });
   });
 
   it("always carries the self-reported disclaimer, even fully confirmed", () => {
@@ -79,15 +79,15 @@ describe("calculateProfit — taxes classified as variable (+R$4.000)", () => {
   );
 
   it("profit: R$6.000", () => {
-    expect(result.profit).toEqual({ status: "confirmed", value: 600_000 });
+    expect(result.profit).toEqual({ status: "available", value: 600_000 });
   });
 
   it("break-even revenue: R$31.250", () => {
-    expect(result.breakEvenRevenue).toEqual({ status: "confirmed", value: 3_125_000 });
+    expect(result.breakEvenRevenue).toEqual({ status: "available", value: 3_125_000 });
   });
 
   it("break-even orders: 625", () => {
-    expect(result.breakEvenOrders).toEqual({ status: "confirmed", value: 625 });
+    expect(result.breakEvenOrders).toEqual({ status: "available", value: 625 });
   });
 });
 
@@ -97,15 +97,15 @@ describe("calculateProfit — taxes classified as fixed (+R$4.000)", () => {
   );
 
   it("profit: R$6.000", () => {
-    expect(result.profit).toEqual({ status: "confirmed", value: 600_000 });
+    expect(result.profit).toEqual({ status: "available", value: 600_000 });
   });
 
   it("break-even revenue: R$35.000", () => {
-    expect(result.breakEvenRevenue).toEqual({ status: "confirmed", value: 3_500_000 });
+    expect(result.breakEvenRevenue).toEqual({ status: "available", value: 3_500_000 });
   });
 
   it("break-even orders: 700", () => {
-    expect(result.breakEvenOrders).toEqual({ status: "confirmed", value: 700 });
+    expect(result.breakEvenOrders).toEqual({ status: "available", value: 700 });
   });
 });
 
@@ -131,7 +131,7 @@ describe("calculateProfit — required cost group unknown", () => {
 
   it("balance before unknown costs is still shown, using only known costs", () => {
     // revenue 5_000_000 - (production 1_500_000 + fees 1_000_000 + delivery 500_000) = 2_000_000
-    expect(result.balanceBeforeUnknownCosts).toEqual({ status: "confirmed", value: 2_000_000 });
+    expect(result.balanceBeforeUnknownCosts).toEqual({ status: "available", value: 2_000_000 });
   });
 
   it("lists the unknown group as a blind spot, never as zero", () => {
@@ -151,7 +151,7 @@ describe("calculateProfit — required costs known but taxes unknown", () => {
   const result = calculateProfit(baseInput({ taxes: { classification: "variable", state: unknown } }));
 
   it("profit before taxes is confirmed", () => {
-    expect(result.profitBeforeTaxes).toEqual({ status: "confirmed", value: 1_000_000 });
+    expect(result.profitBeforeTaxes).toEqual({ status: "available", value: 1_000_000 });
   });
 
   it("final profit (after taxes) is unavailable", () => {
@@ -181,7 +181,7 @@ describe("calculateProfit — costs and taxes all unknown", () => {
   });
 
   it("balance before unknown costs falls back to revenue alone", () => {
-    expect(result.balanceBeforeUnknownCosts).toEqual({ status: "confirmed", value: 5_000_000 });
+    expect(result.balanceBeforeUnknownCosts).toEqual({ status: "available", value: 5_000_000 });
   });
 
   it("every cost group and taxes are listed as blind spots", () => {
@@ -202,7 +202,7 @@ describe("calculateProfit — only the tax total is known (unclassified)", () =>
   );
 
   it("profit is computed normally", () => {
-    expect(result.profit).toEqual({ status: "confirmed", value: 600_000 });
+    expect(result.profit).toEqual({ status: "available", value: 600_000 });
   });
 
   it("break-even is unavailable because the split (fixed vs variable) is unknown", () => {
@@ -227,7 +227,7 @@ describe("calculateProfit — revenue and orders both zero", () => {
   );
 
   it("profit is confirmed as exactly zero (a valid result, not an error)", () => {
-    expect(result.profit).toEqual({ status: "confirmed", value: 0 });
+    expect(result.profit).toEqual({ status: "available", value: 0 });
   });
 
   it("margin and take-home are unavailable (division by zero revenue)", () => {
@@ -262,11 +262,11 @@ describe("calculateProfit — loss is a valid result", () => {
   );
 
   it("profit is confirmed and negative", () => {
-    expect(result.profit).toEqual({ status: "confirmed", value: -200_000 });
+    expect(result.profit).toEqual({ status: "available", value: -200_000 });
   });
 
   it("margin is confirmed and negative", () => {
-    expect(result.marginBps).toEqual({ status: "confirmed", value: -2000 });
+    expect(result.marginBps).toEqual({ status: "available", value: -2000 });
   });
 });
 
@@ -275,7 +275,7 @@ describe("calculateProfit — goal already exceeded", () => {
 
   it("gap to goal is negative (goal already surpassed)", () => {
     // goal 500_000 - profit 1_000_000 = -500_000
-    expect(result.gapToGoal).toEqual({ status: "confirmed", value: -500_000 });
+    expect(result.gapToGoal).toEqual({ status: "available", value: -500_000 });
   });
 });
 
@@ -287,7 +287,7 @@ describe("calculateProfit — unknown goal blocks only the goal comparison", () 
   });
 
   it("profit itself is unaffected", () => {
-    expect(result.profit).toEqual({ status: "confirmed", value: 1_000_000 });
+    expect(result.profit).toEqual({ status: "available", value: 1_000_000 });
   });
 });
 
@@ -295,8 +295,8 @@ describe("calculateProfit — unknown orders blocks only per-order metrics", () 
   const result = calculateProfit(baseInput({ orders: unknown }));
 
   it("profit and margin are unaffected", () => {
-    expect(result.profit).toEqual({ status: "confirmed", value: 1_000_000 });
-    expect(result.marginBps).toEqual({ status: "confirmed", value: 2000 });
+    expect(result.profit).toEqual({ status: "available", value: 1_000_000 });
+    expect(result.marginBps).toEqual({ status: "available", value: 2000 });
   });
 
   it("profit per order and break-even orders are unavailable", () => {
@@ -305,7 +305,7 @@ describe("calculateProfit — unknown orders blocks only per-order metrics", () 
   });
 
   it("break-even revenue is still available", () => {
-    expect(result.breakEvenRevenue).toEqual({ status: "confirmed", value: 2_500_000 });
+    expect(result.breakEvenRevenue).toEqual({ status: "available", value: 2_500_000 });
   });
 });
 
@@ -316,7 +316,7 @@ describe("calculateProfit — ranges: closed estimates, open ranges stay blind s
 
     expect(result.hasEstimatedInputs).toBe(true);
     expect(result.estimatedGroups).toContain("revenue");
-    expect(result.revenue).toEqual({ status: "confirmed", value: 1_000_000 });
+    expect(result.revenue).toEqual({ status: "available", value: 1_000_000 });
   });
 
   it("an open range never produces a numeric estimate and stays a blind spot", () => {
@@ -348,6 +348,60 @@ describe("calculateProfit — top cost groups ranking", () => {
       "fixedStructure",
     ]);
     expect(result.topCostGroups.some((b) => b.group === "delivery")).toBe(false);
+  });
+});
+
+describe("calculateProfit — mandatory regression: overflow degrades only the affected metric", () => {
+  // A near-zero contribution margin (revenue and production one cent apart)
+  // pushes break-even revenue past Number.MAX_SAFE_INTEGER. Profit and
+  // break-even orders must remain available regardless.
+  const result = calculateProfit(
+    baseInput({
+      revenue: informed(10_000_000),
+      costs: {
+        production: { kind: "informed", value: toCents(999_999_999) },
+        fees: zeroConfirmed,
+        delivery: zeroConfirmed,
+        fixedStructure: informed(10_000_000),
+      },
+      taxes: { classification: "variable", state: zeroConfirmed },
+      orders: informedOrders(1000),
+    }),
+  );
+
+  it("profit stays available at -R$9.999.999,99 (-999_999_999 centavos)", () => {
+    expect(result.profit).toEqual({ status: "available", value: -999_999_999 });
+  });
+
+  it("break-even revenue is unavailable — it would exceed the safe integer range", () => {
+    expect(result.breakEvenRevenue).toEqual({ status: "unavailable", reason: "exceeds_safe_range" });
+  });
+
+  it("break-even orders is still evaluated independently and stays available", () => {
+    expect(result.breakEvenOrders).toEqual({ status: "available", value: 1_000_000_000_000 });
+  });
+});
+
+describe("calculateProfit — typed estimate vs range-derived estimate", () => {
+  it("a typed estimate (no range) is marked estimated without inventing bounds", () => {
+    const result = calculateProfit(baseInput({ revenue: estimateTyped(toCents(50_000_00)) }));
+
+    expect(result.hasEstimatedInputs).toBe(true);
+    expect(result.estimatedGroups).toContain("revenue");
+    expect(result.revenue).toEqual({ status: "available", value: 5_000_000 });
+  });
+
+  it("both origins resolve to the same usable value but stay distinguishable at the source", () => {
+    const typed = estimateTyped(toCents(1500));
+    const fromRange = estimateFromRange(toCents(1000), toCents(2000));
+
+    expect(typed).toEqual({ kind: "estimated", origin: "typed", value: 1500 });
+    expect(fromRange).toEqual({
+      kind: "estimated",
+      origin: "range",
+      value: 1500,
+      range: { min: 1000, max: 2000 },
+    });
   });
 });
 

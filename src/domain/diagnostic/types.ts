@@ -22,19 +22,22 @@ export type UnavailableReason =
   | "unclassified_taxes"
   | "non_positive_contribution_margin"
   | "zero_revenue"
-  | "zero_orders";
+  | "zero_orders"
+  /** The derived value would exceed `Number.MAX_SAFE_INTEGER` — only this
+   * one metric is degraded, the rest of the diagnostic still runs. */
+  | "exceeds_safe_range";
 
 export interface UnavailableMetric {
   readonly status: "unavailable";
   readonly reason: UnavailableReason;
 }
 
-export interface ConfirmedMetric<T> {
-  readonly status: "confirmed";
+export interface AvailableMetric<T> {
+  readonly status: "available";
   readonly value: T;
 }
 
-export type Metric<T> = ConfirmedMetric<T> | UnavailableMetric;
+export type Metric<T> = AvailableMetric<T> | UnavailableMetric;
 
 export type BlindSpotField =
   | "revenue"

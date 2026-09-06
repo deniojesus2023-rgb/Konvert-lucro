@@ -38,6 +38,17 @@ describe("roundHalfAwayFromZero", () => {
     expect(Math.round(-1.5)).toBe(-1);
     expect(roundHalfAwayFromZero(-1.5)).toBe(-2);
   });
+
+  it("mandatory regression: never returns -0", () => {
+    const result = roundHalfAwayFromZero(-0.1);
+    expect(result).toBe(0);
+    expect(Object.is(result, -0)).toBe(false);
+    expect(Object.is(result, 0)).toBe(true);
+  });
+
+  it("also normalizes -0 for other small negative fractions that round to zero", () => {
+    expect(Object.is(roundHalfAwayFromZero(-0.49), 0)).toBe(true);
+  });
 });
 
 describe("toCents", () => {

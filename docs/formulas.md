@@ -1,5 +1,10 @@
 # Fórmulas do motor financeiro (`src/domain/diagnostic/`)
 
+Versão da fórmula: `FORMULA_VERSION` em `constants.ts` (atualmente `1.1.0`
+— bumped nesta revisão porque o arredondamento do equilíbrio em receita
+mudou de "mais próximo" para "sempre para cima", o que pode alterar o
+número reportado para os mesmos dados de entrada).
+
 Todo valor monetário é um inteiro de centavos (`Cents`, ver
 `src/domain/money/cents.ts`). Nenhuma operação usa ponto flutuante para
 dinheiro; multiplicações que podem exceder `Number.MAX_SAFE_INTEGER` passam
@@ -14,14 +19,27 @@ valor usável nos cálculos):
 | Estado | Valor usável? | Observação |
 |---|---|---|
 | `informed` | Sim | Valor exato digitado pelo usuário. |
-| `estimated` | Sim | Ponto médio de uma faixa **fechada**, guardado junto com a faixa original. |
+| `estimated` (`origin: "typed"`) | Sim | Estimativa numérica digitada diretamente pelo usuário, **sem** faixa por trás. |
+| `estimated` (`origin: "range"`) | Sim | Ponto médio de uma faixa **fechada**, guardado junto com a faixa original (`range: {min, max}`). |
 | `zero_confirmed` | Sim (= 0) | "Não tenho esse custo" — o único zero legítimo. |
 | `range` (com `max: null`) | Não | Faixa **aberta** ("mais de X") — não tem ponto médio calculável. |
 | `unknown` | Não | "Não sei". |
 | `unanswered` | Não | Pergunta ainda não respondida. |
 
 `unknown` e `unanswered` nunca são tratados como zero em nenhuma soma —
-eles geram uma entrada em `blindSpots`, não um número.
+eles geram uma entrada em `blindSpots` (campo + motivo), não um número.
+
+As duas origens de `estimated` produzem o mesmo tipo de valor usável para
+o cálculo, mas nunca são confundidas na origem: `estimateTyped(value)`
+constrói a primeira, `estimateFromRange(min, max)` constrói a segunda e
+**valida a faixa antes de aceitá-la** — uma faixa invertida (`max < min`)
+é rejeitada com `RangeError`, nunca silenciosamente aceita ou corrigida. Uma
+faixa aberta (`max === null`) nunca produz um ponto médio inventado; ela
+permanece como `{ kind: "range", min, max: null }`, tratada como ponto cego.
+
+Pedidos são validados separadamente por `toOrderCount(value)`: deve ser um
+inteiro seguro (`Number.isSafeInteger`) e não negativo — não existe conceito
+de faixa/estimativa para pedidos nesta fase.
 
 ## Entradas (`DiagnosticInput`)
 
@@ -45,6 +63,12 @@ eles geram uma entrada em `blindSpots`, não um número.
 
 ## Saídas (`ProfitResult`)
 
+Cada métrica derivada é um `Metric<T>`: `{ status: "available", value }` ou
+`{ status: "unavailable", reason }`. (`"available"` — não `"confirmed"`:
+mesmo disponível, o número continua sendo uma estimativa autodeclarada,
+nunca uma confirmação contábil — daí `selfReportedDisclaimer: true` em
+todo resultado, mesmo com tudo preenchido.)
+
 ### Custos conhecidos e saldo antes dos custos não informados
 
 `knownCostsTotalCents` soma **o que estiver resolvido**, mesmo que
@@ -61,7 +85,7 @@ lado.
 
 ### Lucro antes de impostos
 
-Só confirmado se `revenue` **e os quatro grupos obrigatórios** estiverem
+Só disponível se `revenue` **e os quatro grupos obrigatórios** estiverem
 resolvidos:
 
 ```
@@ -75,7 +99,7 @@ Caso contrário: `unavailable`, motivo `missing_revenue` ou
 
 ### Lucro (depois de impostos) — a cifra principal
 
-Requer `profitBeforeTaxes` confirmado **e** os impostos resolvidos:
+Requer `profitBeforeTaxes` disponível **e** os impostos resolvidos:
 
 ```
 profit = profitBeforeTaxes - taxes
@@ -89,7 +113,7 @@ lucro auditado, mesmo com tudo preenchido.
 
 ### Margem e sobra por R$100
 
-Só confirmadas se `profit` estiver confirmado e `revenue > 0`:
+Só disponíveis se `profit` estiver disponível e `revenue > 0`:
 
 ```
 marginBps            = round(profit * 10_000 / revenue)   // 2000 = 20,00%
@@ -104,7 +128,7 @@ centavos**: R$20 de sobra por R$100 vendidos é `2000`, nunca `20`.
 
 ### Lucro médio por pedido
 
-Requer `profit` confirmado e `orders` resolvido e diferente de zero:
+Requer `profit` disponível e `orders` resolvido e diferente de zero:
 
 ```
 profitPerOrder = round(profit / orders)
@@ -132,22 +156,43 @@ Se `contribution <= 0` → `unavailable` (`non_positive_contribution_margin`)
 para as duas métricas abaixo. Caso contrário:
 
 ```
-breakEvenRevenue = round(fixedCosts * revenue / contribution)
+breakEvenRevenue = ceil_to_cent(fixedCosts * revenue / contribution)
 breakEvenOrders  = ceil(fixedCosts * orders / contribution)     // só se orders > 0 conhecido
 ```
 
-`breakEvenOrders` é sempre arredondado **para cima** (não existe pedido
-parcial). As duas fórmulas assumem que a composição de vendas e de custos do
-período se mantém — uma hipótese de simulação, não uma previsão.
+**As duas são sempre arredondadas para cima**, nunca para o mais próximo:
+`breakEvenRevenue` para o próximo centavo (R$333,33... precisa de R$333,34
+— arredondar para baixo diria ao dono que ele já bateu o equilíbrio um
+centavo antes da hora), `breakEvenOrders` para o próximo pedido inteiro
+(não existe pedido parcial). Ambas assumem que a composição de vendas e de
+custos do período se mantém — uma hipótese de simulação, não uma previsão.
 
 Ambas as multiplicações (`fixedCosts * revenue`, `fixedCosts * orders`)
-passam por `BigInt` (`mulDivRound`/`mulDivCeil`) porque podem superar
-`Number.MAX_SAFE_INTEGER` quando os valores de entrada se aproximam do
-teto de R$10.000.000,00 por campo.
+passam por `BigInt` (`mulDivCeil`, em `src/domain/money/arithmetic.ts`)
+porque podem superar `Number.MAX_SAFE_INTEGER` quando os valores de entrada
+se aproximam do teto de R$10.000.000,00 por campo.
+
+#### Overflow: uma métrica indisponível não derruba o diagnóstico
+
+Uma margem de contribuição muito estreita (receita e custo variável quase
+iguais) pode empurrar `breakEvenRevenue` para além de
+`Number.MAX_SAFE_INTEGER` mesmo com entradas individualmente válidas — por
+exemplo, receita e custo fixo ambos em R$10.000.000,00 com apenas R$0,01 de
+contribuição levam o equilíbrio em receita à casa dos quintilhões de
+centavos. Isso **nunca** derruba o cálculo inteiro: `computeOrOverflow`
+(`src/domain/money/arithmetic.ts`) captura especificamente esse estouro
+(via `UnsafeIntegerRangeError`, uma subclasse de `RangeError` só para essa
+condição — nunca confundida com um erro de divisão por zero, que é bug de
+programação e continua propagando normalmente) e a métrica afetada vira
+`{ status: "unavailable", reason: "exceeds_safe_range" }`, enquanto todas
+as outras métricas — inclusive `breakEvenOrders`, calculado de forma
+independente — continuam disponíveis normalmente. O mesmo mecanismo protege
+`profit`, `profitBeforeTaxes`, `marginBps`/`takeHomePer100Cents`,
+`profitPerOrder`, `gapToGoal` e `balanceBeforeUnknownCosts`.
 
 ### Diferença para a meta
 
-Requer `profit` confirmado e `goal` resolvido:
+Requer `profit` disponível e `goal` resolvido:
 
 ```
 gapToGoal = goal - profit

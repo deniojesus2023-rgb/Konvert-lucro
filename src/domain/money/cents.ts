@@ -68,7 +68,12 @@ export const ZERO_CENTS = 0 as Cents;
  * `+Infinity` (`Math.round(-1.5) === -1`).
  */
 export function roundHalfAwayFromZero(value: number): number {
-  return value < 0 ? -Math.round(-value) : Math.round(value);
+  const result = value < 0 ? -Math.round(-value) : Math.round(value);
+  // Normalize -0 (e.g. from rounding -0.1) to 0: they compare equal with
+  // `===` but are distinguishable via `Object.is`, and a signed zero has
+  // no legitimate business meaning here (there's no such thing as a
+  // "negative zero" real).
+  return result === 0 ? 0 : result;
 }
 
 /**

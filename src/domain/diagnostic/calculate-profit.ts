@@ -1,5 +1,5 @@
 import { ZERO_CENTS, toDerivedCents, type Cents } from "../money/cents";
-import { addCents, mulDivRound, subtractCents } from "../money/arithmetic";
+import { addCents, computeOrOverflow, mulDivRound, subtractCents } from "../money/arithmetic";
 import {
   isResolved,
   resolvedValue,
@@ -31,6 +31,17 @@ function unavailable(reason: UnavailableReason): UnavailableMetric {
   return { status: "unavailable", reason };
 }
 
+/**
+ * Runs a `Cents`/`number` computation that could overflow
+ * `Number.MAX_SAFE_INTEGER` and turns that specific, expected failure into
+ * an `unavailable` metric (reason `exceeds_safe_range`) instead of letting
+ * it crash the whole diagnostic. Any other error still propagates.
+ */
+function overflowSafeMetric<T>(compute: () => T): Metric<T> {
+  const result = computeOrOverflow(compute);
+  return result.ok ? { status: "available", value: result.value } : unavailable("exceeds_safe_range");
+}
+
 export function calculateProfit(input: DiagnosticInput): ProfitResult {
   const blindSpots: BlindSpot[] = [];
   const estimatedGroups: BlindSpotField[] = [];
@@ -51,7 +62,7 @@ export function calculateProfit(input: DiagnosticInput): ProfitResult {
   const revenueResolved = isResolved(input.revenue);
   const revenueValue = resolvedValue(input.revenue, ZERO_CENTS);
   const revenue: Metric<Cents> = revenueResolved
-    ? { status: "confirmed", value: revenueValue as Cents }
+    ? { status: "available", value: revenueValue as Cents }
     : unavailable("missing_revenue");
 
   // --- Known costs (whatever is resolved, partial or complete) -------
@@ -90,10 +101,7 @@ export function calculateProfit(input: DiagnosticInput): ProfitResult {
 
   // --- Balance before unknown costs (never called "profit") ----------
   const balanceBeforeUnknownCosts: Metric<Cents> = revenueResolved
-    ? {
-        status: "confirmed",
-        value: subtractCents(revenueValue as Cents, knownCostsTotal),
-      }
+    ? overflowSafeMetric(() => subtractCents(revenueValue as Cents, knownCostsTotal))
     : unavailable("missing_revenue");
 
   // --- Profit before taxes --------------------------------------------
@@ -112,10 +120,9 @@ export function calculateProfit(input: DiagnosticInput): ProfitResult {
   } else if (!requiredCostsResolved) {
     profitBeforeTaxes = unavailable("missing_required_costs");
   } else {
-    profitBeforeTaxes = {
-      status: "confirmed",
-      value: subtractCents(revenueValue as Cents, totalCostsPreTax),
-    };
+    profitBeforeTaxes = overflowSafeMetric(() =>
+      subtractCents(revenueValue as Cents, totalCostsPreTax),
+    );
   }
 
   // --- Profit after taxes (the headline figure) -----------------------
@@ -125,10 +132,7 @@ export function calculateProfit(input: DiagnosticInput): ProfitResult {
   } else if (!taxesResolved || taxesValue === null) {
     profit = unavailable("missing_taxes");
   } else {
-    profit = {
-      status: "confirmed",
-      value: subtractCents(profitBeforeTaxes.value, taxesValue),
-    };
+    profit = overflowSafeMetric(() => subtractCents(profitBeforeTaxes.value, taxesValue));
   }
 
   // --- Margin & take-home per R$100 ------------------------------------
@@ -141,9 +145,11 @@ export function calculateProfit(input: DiagnosticInput): ProfitResult {
     marginBps = unavailable("zero_revenue");
     takeHomePer100Cents = unavailable("zero_revenue");
   } else {
-    const ratioTimes10000 = mulDivRound(profit.value, 10_000, revenueValue as Cents);
-    marginBps = { status: "confirmed", value: ratioTimes10000 };
-    takeHomePer100Cents = { status: "confirmed", value: ratioTimes10000 };
+    const ratio = overflowSafeMetric(() =>
+      mulDivRound(profit.value, 10_000, revenueValue as Cents),
+    );
+    marginBps = ratio;
+    takeHomePer100Cents = ratio;
   }
 
   // --- Profit per order --------------------------------------------------
@@ -157,10 +163,9 @@ export function calculateProfit(input: DiagnosticInput): ProfitResult {
   } else if (ordersValue === 0) {
     profitPerOrder = unavailable("zero_orders");
   } else {
-    profitPerOrder = {
-      status: "confirmed",
-      value: toDerivedCents(mulDivRound(profit.value, 1, ordersValue as number)),
-    };
+    profitPerOrder = overflowSafeMetric(() =>
+      toDerivedCents(mulDivRound(profit.value, 1, ordersValue as number)),
+    );
   }
 
   // --- Break-even ----------------------------------------------------
@@ -208,10 +213,7 @@ export function calculateProfit(input: DiagnosticInput): ProfitResult {
   } else if (!goalResolved) {
     gapToGoal = unavailable("missing_goal");
   } else {
-    gapToGoal = {
-      status: "confirmed",
-      value: subtractCents(goalValue as Cents, profit.value),
-    };
+    gapToGoal = overflowSafeMetric(() => subtractCents(goalValue as Cents, profit.value));
   }
 
   return {

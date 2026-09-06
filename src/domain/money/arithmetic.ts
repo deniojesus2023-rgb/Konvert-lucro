@@ -3,11 +3,26 @@ import { toDerivedCents, type Cents } from "./cents";
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const MIN_SAFE_BIGINT = -MAX_SAFE_BIGINT;
 
-function toSafeNumber(value: bigint): number {
-  if (value > MAX_SAFE_BIGINT || value < MIN_SAFE_BIGINT) {
-    throw new RangeError(
+/**
+ * Thrown when a derived result (not a division-by-zero — that's a
+ * programming error, guarded separately) would exceed
+ * `Number.MAX_SAFE_INTEGER`. This is a distinct class specifically so
+ * callers can catch *this* condition and degrade a single metric to
+ * "unavailable" instead of letting an unrelated bug get swallowed too, and
+ * so one metric overflowing never has to abort the whole diagnostic.
+ */
+export class UnsafeIntegerRangeError extends RangeError {
+  constructor(value: bigint) {
+    super(
       `Resultado intermediário excede o intervalo seguro de inteiros: ${value.toString()}`,
     );
+    this.name = "UnsafeIntegerRangeError";
+  }
+}
+
+function toSafeNumber(value: bigint): number {
+  if (value > MAX_SAFE_BIGINT || value < MIN_SAFE_BIGINT) {
+    throw new UnsafeIntegerRangeError(value);
   }
   return Number(value);
 }
@@ -51,6 +66,27 @@ export function mulDivRound(a: number, b: number, c: number): number {
 
   const signed = resultIsNegative ? -roundedAbs : roundedAbs;
   return toSafeNumber(signed);
+}
+
+/**
+ * Runs `compute`, catching only `UnsafeIntegerRangeError` — an expected,
+ * recoverable data condition — and reporting it as `{ ok: false }` instead
+ * of throwing. Any other error propagates unchanged: this must never mask
+ * a real bug such as an unguarded division by zero. Callers use this to
+ * degrade a single derived metric to "unavailable" without letting one
+ * pathological input abort the rest of the diagnostic.
+ */
+export function computeOrOverflow<T>(
+  compute: () => T,
+): { readonly ok: true; readonly value: T } | { readonly ok: false } {
+  try {
+    return { ok: true, value: compute() };
+  } catch (err) {
+    if (err instanceof UnsafeIntegerRangeError) {
+      return { ok: false };
+    }
+    throw err;
+  }
 }
 
 /**

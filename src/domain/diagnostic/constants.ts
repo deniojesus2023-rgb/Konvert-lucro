@@ -4,7 +4,7 @@
  * alongside every stored result so historical results stay explainable
  * even after the formula evolves.
  */
-export const FORMULA_VERSION = "1.0.0";
+export const FORMULA_VERSION = "1.1.0";
 
 /** The four cost groups that must all be resolved for a confirmed profit. */
 export const REQUIRED_COST_GROUPS = [

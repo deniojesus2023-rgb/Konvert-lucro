@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { toCents, toDerivedCents } from "./cents";
-import { addCents, mulDivCeil, mulDivRound, negateCents, subtractCents } from "./arithmetic";
+import {
+  addCents,
+  computeOrOverflow,
+  mulDivCeil,
+  mulDivRound,
+  negateCents,
+  subtractCents,
+  UnsafeIntegerRangeError,
+} from "./arithmetic";
 
 describe("addCents / subtractCents / negateCents", () => {
   it("adds several values", () => {
@@ -18,6 +26,11 @@ describe("addCents / subtractCents / negateCents", () => {
   it("throws when a sum would exceed the safe integer range", () => {
     const huge = toDerivedCents(Number.MAX_SAFE_INTEGER);
     expect(() => addCents(huge, toCents(10))).toThrow(RangeError);
+  });
+
+  it("throws specifically UnsafeIntegerRangeError on overflow (not a generic RangeError)", () => {
+    const huge = toDerivedCents(Number.MAX_SAFE_INTEGER);
+    expect(() => addCents(huge, toCents(10))).toThrow(UnsafeIntegerRangeError);
   });
 });
 
@@ -66,5 +79,35 @@ describe("mulDivCeil", () => {
 
   it("throws on division by zero", () => {
     expect(() => mulDivCeil(1, 2, 0)).toThrow(RangeError);
+  });
+
+  it("division by zero is a plain RangeError, not UnsafeIntegerRangeError", () => {
+    // Division by zero is a programming error the caller must guard
+    // against, not an "expected" overflow condition — the two must stay
+    // distinguishable so `computeOrOverflow` never accidentally swallows
+    // a real bug.
+    expect(() => mulDivCeil(1, 2, 0)).not.toThrow(UnsafeIntegerRangeError);
+  });
+
+  it("overflows past Number.MAX_SAFE_INTEGER with a near-zero denominator", () => {
+    // fixedCosts 1_000_000_000 * revenue 1_000_000_000 / contribution 1
+    // = 1e18, far beyond Number.MAX_SAFE_INTEGER (~9.007e15).
+    expect(() => mulDivCeil(1_000_000_000, 1_000_000_000, 1)).toThrow(UnsafeIntegerRangeError);
+  });
+});
+
+describe("computeOrOverflow", () => {
+  it("returns the value when the computation succeeds", () => {
+    expect(computeOrOverflow(() => mulDivRound(1, 2, 4))).toEqual({ ok: true, value: 1 });
+  });
+
+  it("reports overflow instead of throwing", () => {
+    expect(computeOrOverflow(() => mulDivCeil(1_000_000_000, 1_000_000_000, 1))).toEqual({
+      ok: false,
+    });
+  });
+
+  it("re-throws any error that isn't an overflow", () => {
+    expect(() => computeOrOverflow(() => mulDivRound(1, 2, 0))).toThrow(RangeError);
   });
 });
