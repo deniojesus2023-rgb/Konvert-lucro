@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CONSENT_TEXT_VERSION } from "@/lib/config/consent";
 
 /**
  * Environment is validated lazily, on first use at request time — never at
@@ -9,7 +10,9 @@ import { z } from "zod";
 const serverEnvSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL é obrigatória"),
   APP_ORIGIN: z.string().url().optional(),
-  CONSENT_TEXT_VERSION: z.string().min(1).default("2026-09-06.v1"),
+  // Defaults to the same constant the wizard's capture step sends, so an
+  // unconfigured environment still can't drift between client and server.
+  CONSENT_TEXT_VERSION: z.string().min(1).default(CONSENT_TEXT_VERSION),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 

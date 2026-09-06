@@ -15,12 +15,22 @@ export interface DraftView {
   sourceDiagnosticId: string | null;
   completedAt: string | null;
   answers: Record<string, unknown>;
+  /**
+   * Set only when `status === "completed"` and a result token exists.
+   * Lets a browser that only persisted the diagnostic id (never the
+   * result path itself — e.g. the finalize response was lost, or the
+   * user just reopens `/raio-x` later) jump straight to the result
+   * without re-asking for name/WhatsApp. Carries only the already-public
+   * token via its path — never `leadId`, name, WhatsApp or consent.
+   */
+  resultPath: string | null;
 }
 
 /**
  * Reads a draft back for the browser that owns it — this is what makes
  * "retomar de onde parou" work. The session hash and any secret material
- * are deliberately absent from the response shape.
+ * are deliberately absent from the response shape, and `resultPath` is
+ * never present unless this exact session proved ownership above.
  */
 export async function getDraft(id: string, sessionSecret: string | null): Promise<DraftView> {
   const db = getDb();
@@ -39,6 +49,10 @@ export async function getDraft(id: string, sessionSecret: string | null): Promis
     sourceDiagnosticId: diagnostic.sourceDiagnosticId,
     completedAt: diagnostic.completedAt?.toISOString() ?? null,
     answers: toAnswersView(rows),
+    resultPath:
+      diagnostic.status === "completed" && diagnostic.resultToken
+        ? `/raio-x/resultado/${diagnostic.resultToken}`
+        : null,
   };
 }
 

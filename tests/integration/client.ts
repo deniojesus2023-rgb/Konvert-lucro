@@ -5,7 +5,9 @@ import { PATCH as patchAnswersRoute } from "@/app/api/raio-x/[id]/answers/route"
 import { POST as finalizeRoute } from "@/app/api/raio-x/[id]/finalize/route";
 import { POST as reviseRoute } from "@/app/api/raio-x/[id]/revise/route";
 import { GET as publicResultRoute } from "@/app/api/raio-x/resultado/[token]/route";
+import { POST as eventsRoute } from "@/app/api/raio-x/events/route";
 import { SESSION_COOKIE_NAME } from "@/server/security/session-cookie";
+import { FUNNEL_COOKIE_NAME } from "@/server/security/funnel-cookie";
 
 const ORIGIN = "http://localhost:3000";
 
@@ -23,6 +25,7 @@ export interface ApiResponse<T = unknown> {
  */
 export class TestClient {
   private cookie: string | null = null;
+  private funnelCookie: string | null = null;
 
   /** Lets a test observe (or forge) the session cookie. */
   getSessionCookie(): string | null {
@@ -31,6 +34,10 @@ export class TestClient {
 
   setSessionCookie(value: string | null): void {
     this.cookie = value;
+  }
+
+  getFunnelCookie(): string | null {
+    return this.funnelCookie;
   }
 
   private buildRequest(
@@ -46,9 +53,10 @@ export class TestClient {
     if (options.body !== undefined && options.contentType !== null) {
       headers.set("content-type", options.contentType ?? "application/json");
     }
-    if (this.cookie) {
-      headers.set("cookie", `${SESSION_COOKIE_NAME}=${this.cookie}`);
-    }
+    const cookies: string[] = [];
+    if (this.cookie) cookies.push(`${SESSION_COOKIE_NAME}=${this.cookie}`);
+    if (this.funnelCookie) cookies.push(`${FUNNEL_COOKIE_NAME}=${this.funnelCookie}`);
+    if (cookies.length > 0) headers.set("cookie", cookies.join("; "));
 
     return new NextRequest(`${ORIGIN}${path}`, {
       method,
@@ -60,8 +68,10 @@ export class TestClient {
   private async capture<T>(response: Response): Promise<ApiResponse<T>> {
     const setCookie = response.headers.getSetCookie?.() ?? [];
     for (const raw of setCookie) {
-      const match = raw.match(new RegExp(`^${SESSION_COOKIE_NAME}=([^;]*)`));
-      if (match) this.cookie = match[1];
+      const sessionMatch = raw.match(new RegExp(`^${SESSION_COOKIE_NAME}=([^;]*)`));
+      if (sessionMatch) this.cookie = sessionMatch[1];
+      const funnelMatch = raw.match(new RegExp(`^${FUNNEL_COOKIE_NAME}=([^;]*)`));
+      if (funnelMatch) this.funnelCookie = funnelMatch[1];
     }
 
     const text = await response.text();
@@ -124,6 +134,11 @@ export class TestClient {
     return this.capture(
       await publicResultRoute(request, { params: Promise.resolve({ token }) }),
     );
+  }
+
+  async sendEvent(body: unknown): Promise<ApiResponse<{ error?: unknown }>> {
+    const request = this.buildRequest("POST", "/api/raio-x/events", { body });
+    return this.capture(await eventsRoute(request));
   }
 }
 

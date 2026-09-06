@@ -1,12 +1,27 @@
+import { FireFunnelEvent } from "@/components/analytics/FireFunnelEvent";
+import { Header } from "@/components/landing/Header";
+import { Hero } from "@/components/landing/Hero";
+import { PainPoints } from "@/components/landing/PainPoints";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { WhatDiagnosticShows } from "@/components/landing/WhatDiagnosticShows";
+import { Transparency } from "@/components/landing/Transparency";
+import { FinalCta } from "@/components/landing/FinalCta";
+import { Footer } from "@/components/landing/Footer";
+
 export default function Home() {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-4 bg-white px-6 text-center">
-      <h1 className="text-2xl font-semibold text-[color:var(--color-navy)]">
-        Konvert
-      </h1>
-      <p className="text-base text-[color:var(--color-navy)]">
-        Fundação do projeto em construção.
-      </p>
-    </main>
+    <div className="flex min-h-full flex-col">
+      <FireFunnelEvent event={{ eventName: "landing_viewed" }} />
+      <Header />
+      <main className="flex-1">
+        <Hero />
+        <PainPoints />
+        <HowItWorks />
+        <WhatDiagnosticShows />
+        <Transparency />
+        <FinalCta />
+      </main>
+      <Footer />
+    </div>
   );
 }

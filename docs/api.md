@@ -83,7 +83,14 @@ sessão.
 }
 ```
 
-Nunca inclui hash de sessão nem qualquer segredo.
+Nunca inclui hash de sessão nem qualquer segredo. Quando o diagnóstico já
+está `completed` (e a sessão é a mesma que o concluiu), a resposta também
+traz `resultPath` (ex.: `/raio-x/resultado/…`) — permite que o navegador
+que só guardou o `id` localmente (a resposta do `finalize` foi perdida, ou
+o usuário só reabriu `/raio-x` depois) va direto para o resultado sem
+pedir nome/WhatsApp de novo. `resultPath` nunca aparece para uma sessão
+inválida, e o payload continua sem `leadId`, nome, WhatsApp ou
+consentimento.
 
 ---
 
@@ -201,3 +208,31 @@ UUID que não existe quanto apagar um diagnóstico que ainda tem revisão) e
 link dele continuam válidos e inalterados para sempre; ao finalizar a
 revisão nasce um segundo resultado,
 com token próprio.
+
+---
+
+### `POST /api/raio-x/events`
+
+Registra um evento do funil. Payload fechado por schema — só os nomes de
+evento documentados e quatro chaves de `metadata` são aceitos; qualquer
+outra coisa (incluindo uma tentativa de mandar `resultToken`, `name` ou
+`whatsapp` dentro de `metadata`) é rejeitada com 422, antes de tocar o
+banco.
+
+```json
+{
+  "eventName": "diagnostic_step_completed",
+  "diagnosticId": "uuid-opcional",
+  "metadata": { "step": 2, "durationMs": 4500, "source": "wizard" }
+}
+```
+
+Eventos aceitos: `landing_viewed`, `diagnostic_started`,
+`diagnostic_step_viewed`, `diagnostic_step_completed`,
+`diagnostic_completed`, `result_viewed`, `offer_viewed`,
+`checkout_clicked`. Chaves de `metadata` aceitas: `step`, `durationMs`,
+`resultMode`, `source`.
+
+Usa um cookie **anônimo e separado** (`konvert_funnel_sid`) do cookie de
+sessão do diagnóstico — não concede nenhum acesso de leitura/escrita, só
+agrupa eventos do mesmo navegador. **204** sem corpo em caso de sucesso.

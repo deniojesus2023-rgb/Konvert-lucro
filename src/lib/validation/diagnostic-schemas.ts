@@ -211,3 +211,51 @@ export const finalizeSchema = z
   .strict();
 
 export type FinalizePayload = z.infer<typeof finalizeSchema>;
+
+/**
+ * The funnel events the product cares about. Anything else is rejected —
+ * this is not a general-purpose analytics sink.
+ */
+export const FUNNEL_EVENT_NAMES = [
+  "landing_viewed",
+  "diagnostic_started",
+  "diagnostic_step_viewed",
+  "diagnostic_step_completed",
+  "diagnostic_completed",
+  "result_viewed",
+  "offer_viewed",
+  "checkout_clicked",
+] as const;
+
+export type FunnelEventName = (typeof FUNNEL_EVENT_NAMES)[number];
+
+/**
+ * A deliberately narrow, closed schema: only these four keys are ever
+ * accepted, so the client cannot smuggle arbitrary (or sensitive) data
+ * into `funnel_events.metadata` no matter what it sends. This is on top
+ * of — not instead of — `assertSafeFunnelMetadata`'s key blocklist in the
+ * repository layer.
+ */
+export const funnelMetadataSchema = z
+  .object({
+    step: z.number().int().min(1).max(8).optional(),
+    durationMs: z
+      .number()
+      .int()
+      .min(0)
+      .max(24 * 60 * 60 * 1000)
+      .optional(),
+    resultMode: z.enum(["available", "partial"]).optional(),
+    source: z.string().max(50).optional(),
+  })
+  .strict();
+
+export const funnelEventSchema = z
+  .object({
+    eventName: z.enum(FUNNEL_EVENT_NAMES),
+    diagnosticId: uuidParamSchema.optional(),
+    metadata: funnelMetadataSchema.optional(),
+  })
+  .strict();
+
+export type FunnelEventPayload = z.infer<typeof funnelEventSchema>;
