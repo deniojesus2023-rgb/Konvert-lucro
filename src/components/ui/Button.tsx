@@ -4,25 +4,21 @@ import Link from "next/link";
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost";
-export type ButtonSize = "default" | "compact";
 
-const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-[8px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-primary disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none";
-
-const SIZES: Record<ButtonSize, string> = {
-  default: "min-h-[44px] px-6 py-3 text-base",
-  compact: "min-h-[40px] px-4 py-2 text-sm",
-};
-
+/**
+ * `primary`/`ghost` map straight onto the prototype's own `.primary-button`
+ * and `.text-link` classes — pixel-identical to the reference by
+ * construction. `secondary` has no prototype equivalent (only used by the
+ * error-retry state) and keeps a plain bordered fallback.
+ */
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-blue-primary text-white hover:bg-[#0f5adb]",
-  secondary: "border border-line-strong bg-transparent text-ink hover:border-ink-faint",
-  ghost: "bg-transparent text-blue-primary underline-offset-4 hover:underline",
+  primary: "primary-button",
+  secondary: "text-link",
+  ghost: "text-link",
 };
 
 interface CommonProps {
   variant?: ButtonVariant;
-  size?: ButtonSize;
   fullWidth?: boolean;
   children: ReactNode;
   className?: string;
@@ -36,11 +32,8 @@ type AsLink = CommonProps &
 export type ButtonProps = AsButton | AsLink;
 
 export function Button(props: ButtonProps) {
-  const { variant = "primary", size = "default", fullWidth, children, className, href, ...rest } =
-    props;
-  const classes = [BASE, SIZES[size], VARIANTS[variant], fullWidth ? "w-full" : "", className ?? ""]
-    .filter(Boolean)
-    .join(" ");
+  const { variant = "primary", fullWidth, children, className, href, ...rest } = props;
+  const classes = [VARIANTS[variant], fullWidth ? "full" : "", className ?? ""].filter(Boolean).join(" ");
 
   if (href) {
     return (

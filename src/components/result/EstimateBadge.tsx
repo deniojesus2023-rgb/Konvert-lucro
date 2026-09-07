@@ -17,9 +17,9 @@ export function EstimateBadge({ estimatedGroups }: EstimateBadgeProps) {
   if (estimatedGroups.length === 0) return null;
 
   return (
-    <div className="border-l-2 border-blue-primary pl-4">
-      <p className="text-sm font-medium text-blue-primary">Contém valores aproximados</p>
-      <p className="mt-1 text-sm text-ink-soft">
+    <div className="legal-note">
+      <strong>Contém valores aproximados</strong>
+      <p>
         Estas respostas foram aproximadas e podem ser revisadas a qualquer momento:{" "}
         {estimatedGroups.map(fieldLabel).join(", ")}.
       </p>

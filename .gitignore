@@ -41,6 +41,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# scratch visual-QA screenshots — not a build artifact, not source
+/artifacts/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

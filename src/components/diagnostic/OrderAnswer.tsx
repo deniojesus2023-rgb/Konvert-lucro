@@ -2,11 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ResponseState } from "@/domain/diagnostic/response-state";
-import {
-  emptyOrderUiState,
-  orderUiToResponseState,
-  responseStateToOrderUi,
-} from "@/lib/client/order-answer";
+import { emptyOrderUiState, orderUiToResponseState, responseStateToOrderUi } from "@/lib/client/order-answer";
 import { AnswerTabs } from "./AnswerTabs";
 
 interface OrderAnswerProps {
@@ -28,7 +24,7 @@ export function OrderAnswer({ id, label, note, hint, value, onChange }: OrderAns
   }, [ui]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
       <AnswerTabs
         legend="Como você quer responder?"
         name={`${id}-mode`}
@@ -42,8 +38,8 @@ export function OrderAnswer({ id, label, note, hint, value, onChange }: OrderAns
       />
 
       {ui.mode === "exact" && (
-        <div className="flex flex-col gap-2">
-          <label htmlFor={id} className="text-sm text-ink-soft">
+        <div className="input-group">
+          <label htmlFor={id} className="field-label">
             {label}
           </label>
           <input
@@ -55,13 +51,18 @@ export function OrderAnswer({ id, label, note, hint, value, onChange }: OrderAns
             value={ui.value}
             onChange={(event) => setUi((prev) => ({ ...prev, value: event.target.value }))}
             placeholder="0"
-            className="border-b border-line-strong bg-transparent pb-2 text-4xl font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-faint transition-colors focus:border-blue-primary sm:text-5xl"
+            className="line-input"
           />
         </div>
       )}
 
-      {note && <p className="text-sm text-ink-soft">{note}</p>}
-      {hint && ui.mode === "exact" && <p className="text-sm text-ink-soft">{hint}</p>}
-    </div>
+      {ui.mode === "unknown" && (
+        <p className="help-text">O lucro por pedido ficará indisponível, mas as demais métricas poderão ser calculadas.</p>
+      )}
+      {ui.mode === "zero" && <p className="help-text">Você confirmou que não houve pedidos no período.</p>}
+
+      {note && <p className="help-text">{note}</p>}
+      {hint && ui.mode === "exact" && <p className="help-text">{hint}</p>}
+    </>
   );
 }

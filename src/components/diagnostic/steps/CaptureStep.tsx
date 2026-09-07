@@ -23,24 +23,25 @@ interface CaptureStepProps {
 
 export function CaptureStep({ contact, onChange }: CaptureStepProps) {
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-2">
-        <label htmlFor="contact-name" className="text-sm text-ink-soft">
-          Seu nome
+    <div className="contact-fields">
+      <div className="input-group">
+        <label htmlFor="contact-name" className="field-label">
+          Nome
         </label>
         <input
           id="contact-name"
           name="name"
           type="text"
           autoComplete="name"
+          placeholder="Como podemos te chamar?"
           value={contact.name}
           onChange={(event) => onChange({ ...contact, name: event.target.value })}
-          className="border-b border-line-strong bg-transparent pb-2 text-2xl font-semibold text-ink outline-none transition-colors focus:border-blue-primary sm:text-3xl"
+          className="line-input small"
         />
       </div>
 
-      <div className="flex flex-col gap-2">
-        <label htmlFor="contact-whatsapp" className="text-sm text-ink-soft">
+      <div className="input-group">
+        <label htmlFor="contact-whatsapp" className="field-label">
           WhatsApp
         </label>
         <input
@@ -49,41 +50,36 @@ export function CaptureStep({ contact, onChange }: CaptureStepProps) {
           type="tel"
           inputMode="tel"
           autoComplete="tel"
-          placeholder="(11) 98888-7777"
+          placeholder="(11) 99999-9999"
           value={contact.whatsapp}
           onChange={(event) => onChange({ ...contact, whatsapp: event.target.value })}
-          className="border-b border-line-strong bg-transparent pb-2 text-2xl font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-faint transition-colors focus:border-blue-primary sm:text-3xl"
+          className="line-input small"
         />
       </div>
 
-      <label className="flex items-start gap-3 text-sm text-ink-soft">
+      <label className="consent-row">
         <input
           type="checkbox"
           checked={contact.contactConsent}
           onChange={(event) => onChange({ ...contact, contactConsent: event.target.checked })}
-          className="mt-0.5 h-5 w-5 shrink-0 rounded border-line-strong text-blue-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-primary"
         />
         <span>
-          Autorizo a Konvert a armazenar meu nome, WhatsApp e respostas para gerar, salvar e
-          permitir o acesso a este diagnóstico. Veja a{" "}
-          <Link href="/privacidade" className="text-blue-primary hover:underline">
+          Autorizo a Konvert a armazenar meu nome, WhatsApp e respostas para gerar, salvar e permitir o acesso a
+          este diagnóstico. Veja a{" "}
+          <Link href="/privacidade" className="text-link">
             política de privacidade
           </Link>
           .
         </span>
       </label>
 
-      <label className="flex items-start gap-3 text-sm text-ink-soft">
+      <label className="consent-row">
         <input
           type="checkbox"
           checked={contact.marketingOptIn}
           onChange={(event) => onChange({ ...contact, marketingOptIn: event.target.checked })}
-          className="mt-0.5 h-5 w-5 shrink-0 rounded border-line-strong text-blue-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-primary"
         />
-        <span>
-          Quero receber dicas e novidades da Konvert pelo WhatsApp.{" "}
-          <span className="text-ink-faint">Opcional</span>
-        </span>
+        <span>Quero receber dicas e novidades da Konvert pelo WhatsApp.</span>
       </label>
     </div>
   );

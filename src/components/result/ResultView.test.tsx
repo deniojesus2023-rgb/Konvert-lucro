@@ -49,7 +49,8 @@ describe("ResultView — profit available", () => {
   it("shows the take-home-per-R$100 headline and the profit/margin figures", () => {
     renderResult(baseInput());
 
-    expect(screen.getByText(/De cada R\$100 vendidos, R\$20 ficaram no seu delivery\./)).toBeInTheDocument();
+    expect(screen.getByText(/De cada R\$100 vendidos,/)).toBeInTheDocument();
+    expect(screen.getByText(/R\$20 ficaram no seu delivery\./)).toBeInTheDocument();
     const profitBlock = screen.getByText("Lucro mensal estimado").closest("div")!;
     expect(profitBlock.textContent).toContain("10.000,00");
     expect(screen.getByText("20,00%")).toBeInTheDocument();
@@ -153,8 +154,8 @@ describe("ResultView — blind spots never join the known-costs statement", () =
         },
       }),
     );
-    const knownSection = screen.getByText("O que já sabemos").closest("div")!;
+    const knownSection = screen.getByText("O que já sabemos").closest("section")!;
     expect(knownSection.textContent).not.toContain("Entregas");
-    expect(screen.getByText("O que falta informar").closest("div")!.textContent).toContain("Entregas");
+    expect(screen.getByText("O que falta informar").closest("section")!.textContent).toContain("Entregas");
   });
 });

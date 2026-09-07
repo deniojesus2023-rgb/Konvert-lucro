@@ -24,19 +24,18 @@ export function BlindSpotList({ blindSpots }: BlindSpotListProps) {
   if (blindSpots.length === 0) return null;
 
   return (
-    <div>
-      <h2 className="text-lg font-semibold text-ink">O que falta informar</h2>
-      <dl className="mt-4 flex flex-col">
-        {blindSpots.map((spot) => (
-          <div key={spot.field} className="flex items-baseline justify-between gap-4 border-b border-line py-3">
-            <dt className="text-ink">{fieldLabel(spot.field)}</dt>
-            <dd className="text-right text-ink-soft">{BLIND_SPOT_HINTS[spot.field] ?? ""}</dd>
+    <section className="missing-list">
+      <h2>O que falta informar</h2>
+      {blindSpots.map((spot) => (
+        <div key={spot.field} className="statement-row">
+          <div>
+            <strong>{fieldLabel(spot.field)}</strong>
+            <small>{BLIND_SPOT_HINTS[spot.field] ?? ""}</small>
           </div>
-        ))}
-      </dl>
-      <p className="mt-4 text-ink-soft">
-        Sem esses valores, margem, lucro e ponto de equilíbrio ficam indisponíveis.
-      </p>
-    </div>
+          <span>Ponto cego</span>
+        </div>
+      ))}
+      <p className="help-text">Sem esses valores, margem, lucro e ponto de equilíbrio ficam indisponíveis.</p>
+    </section>
   );
 }

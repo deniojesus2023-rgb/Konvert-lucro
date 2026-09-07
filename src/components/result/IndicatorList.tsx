@@ -10,19 +10,14 @@ interface IndicatorListProps {
 
 export function IndicatorList({ title, rows }: IndicatorListProps) {
   return (
-    <div>
-      <h2 className="text-lg font-semibold text-ink">{title}</h2>
-      <dl className="mt-4 flex flex-col">
-        {rows.map((row, index) => (
-          <div
-            key={`${row.label}-${index}`}
-            className="flex items-baseline justify-between gap-4 border-b border-line py-3"
-          >
-            <dt className="text-ink-soft">{row.label}</dt>
-            <dd className="text-ink">{row.value}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
+    <section>
+      <h2>{title}</h2>
+      {rows.map((row, index) => (
+        <div key={`${row.label}-${index}`} className="statement-row">
+          <span>{row.label}</span>
+          <strong>{row.value}</strong>
+        </div>
+      ))}
+    </section>
   );
 }

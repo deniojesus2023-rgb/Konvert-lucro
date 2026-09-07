@@ -14,17 +14,17 @@ export function OfferCtaButton() {
 
   if (clicked) {
     return (
-      <div role="status" className="border-l-2 border-blue-primary py-2 pl-4">
-        <p className="font-semibold text-ink">Interesse registrado!</p>
-        <p className="mt-1 text-sm text-ink-soft">
-          Vamos avisar você assim que o acesso à Konvert estiver disponível.
+      <div role="status">
+        <p>
+          <strong>Interesse registrado!</strong>
         </p>
+        <p className="help-text">Vamos avisar você assim que o acesso à Konvert estiver disponível.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <>
       <Button
         fullWidth
         onClick={() => {
@@ -34,10 +34,7 @@ export function OfferCtaButton() {
       >
         Começar a acompanhar meu lucro <span aria-hidden="true">→</span>
       </Button>
-      <p className="text-xs text-ink-faint">
-        A contratação ainda não está disponível. Ao continuar, você registra interesse no
-        lançamento da Konvert.
-      </p>
-    </div>
+      <small>A contratação ainda não está disponível. Ao continuar, você registra interesse no lançamento da Konvert.</small>
+    </>
   );
 }

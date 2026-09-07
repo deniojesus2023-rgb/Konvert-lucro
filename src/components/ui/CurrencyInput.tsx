@@ -7,7 +7,7 @@ interface CurrencyInputProps {
   onChange: (value: string) => void;
   placeholder?: string;
   error?: string;
-  /** Large editorial numeral style (the primary answer field). Defaults to true. */
+  /** Matches the prototype's smaller `.line-input.small` variant used for range fields. */
   large?: boolean;
 }
 
@@ -17,26 +17,13 @@ interface CurrencyInputProps {
  * `src/lib/client/currency.ts` (which wraps the domain's money module) —
  * this component only carries the raw string the user is typing.
  */
-export function CurrencyInput({
-  id,
-  label,
-  value,
-  onChange,
-  placeholder,
-  error,
-  large = true,
-}: CurrencyInputProps) {
+export function CurrencyInput({ id, label, value, onChange, placeholder, error, large = true }: CurrencyInputProps) {
   return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor={id} className="text-sm text-ink-soft">
+    <div className="input-group">
+      <label htmlFor={id} className="field-label">
         {label}
       </label>
-      <div
-        className={`flex items-baseline gap-2 border-b pb-2 transition-colors focus-within:border-blue-primary ${
-          error ? "border-red-400" : "border-line-strong"
-        }`}
-      >
-        <span className={`text-ink-faint ${large ? "text-2xl" : "text-base"}`}>R$</span>
+      <div className="currency-wrap">
         <input
           id={id}
           name={id}
@@ -48,13 +35,11 @@ export function CurrencyInput({
           placeholder={placeholder ?? "0,00"}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${id}-error` : undefined}
-          className={`min-w-0 flex-1 bg-transparent font-semibold text-ink outline-none placeholder:text-ink-faint placeholder:font-normal ${
-            large ? "text-4xl sm:text-5xl" : "text-xl"
-          }`}
+          className={`line-input ${large ? "" : "small"}`}
         />
       </div>
       {error && (
-        <p id={`${id}-error`} className="text-sm text-red-600">
+        <p id={`${id}-error`} className="question-error" role="alert">
           {error}
         </p>
       )}

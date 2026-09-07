@@ -61,7 +61,7 @@ export function MonetaryAnswer({
   }, [ui]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
       {!simplified && (
         <AnswerTabs
           legend="Como você quer responder?"
@@ -92,17 +92,17 @@ export function MonetaryAnswer({
       {ui.mode === "approximate" && (
         <CurrencyInput
           id={`${id}-approx`}
-          label={label}
+          label={`Valor aproximado`}
           value={ui.approximateValue}
           onChange={(approximateValue) => setUi((prev) => ({ ...prev, approximateValue }))}
         />
       )}
 
       {ui.mode === "range" && (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div className="range-grid">
           <CurrencyInput
             id={`${id}-min`}
-            label="De"
+            label="Valor mínimo"
             value={ui.rangeMin}
             onChange={(rangeMin) => setUi((prev) => ({ ...prev, rangeMin }))}
             large={false}
@@ -118,37 +118,35 @@ export function MonetaryAnswer({
         </div>
       )}
 
-      {note && <p className="text-sm text-ink-soft">{note}</p>}
+      {ui.mode === "unknown" && (
+        <p className="help-text">
+          Tudo bem não saber. Essa informação aparecerá como ponto cego no resultado e nunca será
+          transformada em zero.
+        </p>
+      )}
+
+      {ui.mode === "zero" && <p className="help-text">Você confirmou que esse valor foi zero no período.</p>}
+
+      {note && <p className="help-text">{note}</p>}
 
       {simplified && (
-        <div>
-          <label className="relative cursor-pointer rounded-sm outline-offset-2 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-blue-primary">
-            <input
-              type="radio"
-              name={`${id}-mode`}
-              checked={ui.mode === "zero"}
-              onChange={() => setUi((prev) => (prev.mode === "zero" ? prev : emptyMonetaryUiState("zero")))}
-              className="absolute inset-0 z-10 cursor-pointer opacity-0"
-            />
-            <span
-              className={`text-sm underline decoration-line-strong underline-offset-4 hover:decoration-ink ${
-                ui.mode === "zero" ? "font-medium text-blue-primary decoration-blue-primary" : "text-ink-soft"
-              }`}
-            >
-              {zeroLabel}
-            </span>
-          </label>
+        <div className="response-types">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={ui.mode === "zero"}
+            className={`response-type ${ui.mode === "zero" ? "selected" : ""}`}
+            onClick={() => setUi((prev) => (prev.mode === "zero" ? prev : emptyMonetaryUiState("zero")))}
+          >
+            {zeroLabel}
+          </button>
           {ui.mode === "zero" && (
-            <button
-              type="button"
-              onClick={() => setUi(emptyMonetaryUiState("exact"))}
-              className="ml-4 text-sm text-blue-primary underline underline-offset-4"
-            >
+            <button type="button" className="text-link" onClick={() => setUi(emptyMonetaryUiState("exact"))}>
               Informar um valor
             </button>
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -15,11 +15,8 @@ interface ErrorStateProps {
  */
 export function ErrorState({ message, onRetry, retryLabel = "Tentar de novo" }: ErrorStateProps) {
   return (
-    <div
-      role="alert"
-      className="flex flex-col items-center gap-4 border-l-2 border-red-400 py-4 pl-4 text-center sm:text-left"
-    >
-      <p className="text-ink">{message}</p>
+    <div role="alert" className="error-state">
+      <p>{message}</p>
       {onRetry && (
         <Button variant="secondary" onClick={onRetry}>
           {retryLabel}

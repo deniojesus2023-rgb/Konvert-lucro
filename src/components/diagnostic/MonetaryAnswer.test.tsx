@@ -80,7 +80,7 @@ describe("MonetaryAnswer", () => {
     );
 
     await user.click(screen.getByRole("radio", { name: "Uma faixa" }));
-    await user.type(screen.getByLabelText("De"), "5000");
+    await user.type(screen.getByLabelText("Valor mínimo"), "5000");
 
     expect(onChange).toHaveBeenLastCalledWith({ kind: "range", min: 500_000, max: null });
   });

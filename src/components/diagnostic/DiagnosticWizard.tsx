@@ -265,7 +265,10 @@ export function DiagnosticWizard() {
       setScreenIndex((current) => current - 1);
       return;
     }
-    if (step === 1) return;
+    if (step === 1) {
+      router.push("/");
+      return;
+    }
     const previousStep = step - 1;
     setStep(previousStep);
     setScreenIndex(Math.max(0, previousStepScreenCount - 1));
@@ -412,7 +415,8 @@ export function DiagnosticWizard() {
       description={current.description}
       footnote={current.footnote}
       helper={current.helper}
-      onBack={step > 1 || screenIndex > 0 ? () => goBack(previousStepScreens.length) : undefined}
+      onBack={() => goBack(previousStepScreens.length)}
+      onExit={() => router.push("/")}
       onContinue={handleContinue}
       continueLabel={isLastMacroStep && isLastScreenOfStep ? "Ver meu resultado" : "Continuar"}
       continueDisabled={!current.complete}
