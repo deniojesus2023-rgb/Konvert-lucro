@@ -3,10 +3,13 @@
 SaaS para donos de delivery descobrirem e acompanharem o lucro real da
 operação.
 
-Estado atual: **Fase 1B** — motor financeiro (1A) + banco, persistência,
-segurança e APIs do diagnóstico "Raio-X do Lucro". Ainda **não** existem
-telas: landing, wizard, tela de resultado, oferta, checkout, assinatura e
-autenticação de usuário ficam para a Fase 1C em diante.
+Estado atual: diagnóstico gratuito completo ("Raio-X do Lucro" — motor
+financeiro, banco, telas e funil, Fases 1A-1C) **+** produto pago de
+acompanhamento contínuo completo (contas, lançamento diário, custos
+recorrentes, metas, comparação de período e assinatura via Stripe, Fases
+0-5). Análises avançadas, alertas, simulador, histórico, importação CSV e
+integrações (iFood/PDV) são Fase 6 — fora de escopo por decisão explícita
+do plano técnico.
 
 ## Requisitos
 
@@ -29,6 +32,14 @@ cp .env.example .env.local   # e preencha as variáveis
 | `TEST_DATABASE_URL` | Sim, para `test:integration` | Banco de testes (separado). |
 | `APP_ORIGIN` | Não | Origem esperada no header `Origin` das rotas de escrita. Sem ela, usa a origem da própria requisição. |
 | `CONSENT_TEXT_VERSION` | Não | Versão do texto de consentimento registrada em cada consentimento. |
+| `STRIPE_SECRET_KEY` | Não* | Chave secreta da API do Stripe. |
+| `STRIPE_WEBHOOK_SECRET` | Não* | Segredo de assinatura do endpoint de webhook (`stripe listen` ou painel do Stripe). |
+| `STRIPE_PRICE_ID` | Não* | Price ID do plano de assinatura vendido no Checkout. |
+
+\* As três variáveis do Stripe só são exigidas na hora de efetivamente
+iniciar um checkout, abrir o portal de cobrança ou processar um webhook —
+qualquer outra rota, e `pnpm build`, funcionam normalmente sem nenhuma
+delas configurada (`getStripeEnv()` falha alto e só nesse momento).
 
 As variáveis são validadas com Zod de forma **lazy** (`src/lib/env.ts`), por
 requisição — `pnpm build` continua funcionando em máquina sem banco e sem
@@ -97,17 +108,31 @@ headers são exercitados como um navegador faria.
 
 ```
 src/
-├── app/api/raio-x/        Route Handlers: HTTP, cookies, status, headers
+├── app/
+│   ├── api/raio-x/        Route Handlers do diagnóstico: HTTP, cookies, status
+│   ├── api/auth/          magic-link: pedir/verificar link, logout
+│   ├── api/app/           Route Handlers do produto pago (escopados por establishmentId)
+│   ├── api/billing/       webhook do Stripe
+│   └── app/               telas autenticadas: painel, lançamentos, vendas,
+│                          custos recorrentes, metas, configurações
 ├── server/
 │   ├── db/                schema Drizzle, client lazy, codec de dinheiro
 │   ├── repositories/      consultas Drizzle
 │   ├── services/          regras de aplicação e transações
-│   ├── security/          cookie de sessão, rate limit
+│   │   ├── auth/          magic-link, sessão de app
+│   │   └── billing/       Stripe: checkout, portal, webhook, guarda de monotonicidade
+│   ├── security/          cookies de sessão (diagnóstico e app), rate limit
 │   └── http/              guards de JSON/Origin/tamanho, erros padronizados
 ├── lib/
 │   ├── validation/        schemas Zod + normalização de respostas
+│   ├── client/            wrappers de fetch para o browser
+│   ├── dates/             fronteiras de dia/semana/mês por timezone do estabelecimento
 │   └── env.ts             validação lazy do ambiente
-└── domain/                cálculo puro — sem React, Next, banco ou rede
+└── domain/
+    ├── diagnostic/        motor do diagnóstico gratuito (Fase 1A, congelado)
+    ├── tracking/          motor do acompanhamento contínuo (Fase 3+)
+    ├── money/             Cents + aritmética BigInt-safe, compartilhado pelos dois motores
+    └── token/             segredos opacos (hash/comparação em tempo constante)
 ```
 
 Regra dura: nenhuma regra financeira nas rotas, e `src/domain/` nunca
@@ -184,7 +209,17 @@ começa desmarcado e recusá-lo nunca bloqueia o resultado.
   edge/WAF — fora do escopo desta fase.
 - **Expiração/revogação de token** existem no schema e são respeitadas na
   leitura, mas nenhuma rota as define ainda (não há painel para isso).
-- **`funnel_events`**: a tabela e o guard de metadata existem e são
-  testados, mas nenhuma rota emite eventos — isso entra com a interface, na
-  Fase 1C.
-- **Sem telas e sem autenticação de usuário**: tudo nesta fase é API.
+- **Checkout e portal do Stripe não são testáveis de ponta a ponta neste
+  ambiente**: exigem uma conta Stripe real e rede de saída para
+  `api.stripe.com`. A verificação de assinatura de webhook, a idempotência,
+  a guarda de monotonicidade e todos os guards de autorização são cobertos
+  por testes de integração reais (assinatura gerada localmente via
+  `stripe.webhooks.generateTestHeaderString`, sem rede); a criação de uma
+  sessão de Checkout/Portal em si só foi validada manualmente até o ponto
+  anterior à chamada de rede ao Stripe.
+- **Sem bloqueio de acesso por assinatura**: uma assinatura inativa hoje só
+  aparece como informação no painel de Configurações (`/app/configuracoes`)
+  — nenhuma tela ou rota do produto pago é bloqueada por falta de
+  assinatura ativa. Isso foi uma decisão deliberada para não arriscar
+  regressão nas Fases 1-4 sem um critério de aceite explícito para o que
+  exatamente fica bloqueado; adicionar o gate é trabalho futuro.

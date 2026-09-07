@@ -14,6 +14,14 @@ const serverEnvSchema = z.object({
   // unconfigured environment still can't drift between client and server.
   CONSENT_TEXT_VERSION: z.string().min(1).default(CONSENT_TEXT_VERSION),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  // Billing (Phase 5) — optional here so `next build` and every non-billing
+  // route keep working with no Stripe account configured at all. Routes
+  // that actually need Stripe call `getStripeEnv()` (in
+  // `server/services/billing/stripe-client.ts`), which fails loudly and
+  // only at the moment billing is actually used.
+  STRIPE_SECRET_KEY: z.string().min(1).optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+  STRIPE_PRICE_ID: z.string().min(1).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -28,6 +36,9 @@ export function getEnv(): ServerEnv {
     APP_ORIGIN: process.env.APP_ORIGIN,
     CONSENT_TEXT_VERSION: process.env.CONSENT_TEXT_VERSION,
     NODE_ENV: process.env.NODE_ENV,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID,
   });
 
   if (!parsed.success) {

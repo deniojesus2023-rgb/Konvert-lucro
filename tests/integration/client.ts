@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import { sql } from "drizzle-orm";
+import { db } from "./setup";
 import { POST as createDraft } from "@/app/api/raio-x/route";
 import { GET as getDraftRoute } from "@/app/api/raio-x/[id]/route";
 import { PATCH as patchAnswersRoute } from "@/app/api/raio-x/[id]/answers/route";
@@ -8,6 +10,27 @@ import { GET as publicResultRoute } from "@/app/api/raio-x/resultado/[token]/rou
 import { POST as eventsRoute } from "@/app/api/raio-x/events/route";
 import { SESSION_COOKIE_NAME } from "@/server/security/session-cookie";
 import { FUNNEL_COOKIE_NAME } from "@/server/security/funnel-cookie";
+import { APP_SESSION_COOKIE_NAME } from "@/server/security/app-session-cookie";
+import { POST as requestLinkRoute } from "@/app/api/auth/request-link/route";
+import { POST as verifyRoute } from "@/app/api/auth/verify/route";
+import { POST as activateAccountRoute } from "@/app/api/raio-x/[id]/activate-account/route";
+import {
+  GET as listDailyEntriesRoute,
+  POST as postDailyEntryRoute,
+} from "@/app/api/app/establishments/[establishmentId]/daily-entries/route";
+import { GET as getSummaryRoute } from "@/app/api/app/establishments/[establishmentId]/summary/route";
+import {
+  GET as listRecurringCostsRoute,
+  POST as postRecurringCostRoute,
+} from "@/app/api/app/establishments/[establishmentId]/recurring-costs/route";
+import {
+  GET as getGoalRoute,
+  POST as postGoalRoute,
+} from "@/app/api/app/establishments/[establishmentId]/goals/route";
+import { POST as checkoutRoute } from "@/app/api/app/establishments/[establishmentId]/billing/checkout/route";
+import { POST as portalRoute } from "@/app/api/app/establishments/[establishmentId]/billing/portal/route";
+import { GET as getSubscriptionRoute } from "@/app/api/app/establishments/[establishmentId]/subscription/route";
+import { POST as webhookRoute } from "@/app/api/billing/webhook/route";
 
 const ORIGIN = "http://localhost:3000";
 
@@ -26,6 +49,7 @@ export interface ApiResponse<T = unknown> {
 export class TestClient {
   private cookie: string | null = null;
   private funnelCookie: string | null = null;
+  private appCookie: string | null = null;
 
   /** Lets a test observe (or forge) the session cookie. */
   getSessionCookie(): string | null {
@@ -38,6 +62,14 @@ export class TestClient {
 
   getFunnelCookie(): string | null {
     return this.funnelCookie;
+  }
+
+  getAppSessionCookie(): string | null {
+    return this.appCookie;
+  }
+
+  setAppSessionCookie(value: string | null): void {
+    this.appCookie = value;
   }
 
   private buildRequest(
@@ -56,6 +88,7 @@ export class TestClient {
     const cookies: string[] = [];
     if (this.cookie) cookies.push(`${SESSION_COOKIE_NAME}=${this.cookie}`);
     if (this.funnelCookie) cookies.push(`${FUNNEL_COOKIE_NAME}=${this.funnelCookie}`);
+    if (this.appCookie) cookies.push(`${APP_SESSION_COOKIE_NAME}=${this.appCookie}`);
     if (cookies.length > 0) headers.set("cookie", cookies.join("; "));
 
     return new NextRequest(`${ORIGIN}${path}`, {
@@ -72,6 +105,8 @@ export class TestClient {
       if (sessionMatch) this.cookie = sessionMatch[1];
       const funnelMatch = raw.match(new RegExp(`^${FUNNEL_COOKIE_NAME}=([^;]*)`));
       if (funnelMatch) this.funnelCookie = funnelMatch[1];
+      const appMatch = raw.match(new RegExp(`^${APP_SESSION_COOKIE_NAME}=([^;]*)`));
+      if (appMatch) this.appCookie = appMatch[1];
     }
 
     const text = await response.text();
@@ -140,6 +175,150 @@ export class TestClient {
     const request = this.buildRequest("POST", "/api/raio-x/events", { body });
     return this.capture(await eventsRoute(request));
   }
+
+  async requestMagicLink(
+    email: string,
+  ): Promise<ApiResponse<{ message?: string; devVerifyUrl?: string; error?: unknown }>> {
+    const request = this.buildRequest("POST", "/api/auth/request-link", { body: { email } });
+    return this.capture(await requestLinkRoute(request));
+  }
+
+  async verifyMagicLink(token: string): Promise<ApiResponse<{ ok?: boolean; error?: unknown }>> {
+    const request = this.buildRequest("POST", "/api/auth/verify", { body: { token } });
+    return this.capture(await verifyRoute(request));
+  }
+
+  async activateAccount(
+    id: string,
+    body: { email: string; establishmentName: string },
+  ): Promise<ApiResponse<{ message?: string; devVerifyUrl?: string; error?: unknown }>> {
+    const request = this.buildRequest("POST", `/api/raio-x/${id}/activate-account`, { body });
+    return this.capture(await activateAccountRoute(request, { params: Promise.resolve({ id }) }));
+  }
+
+  async postDailyEntry(
+    establishmentId: string,
+    body: unknown,
+  ): Promise<ApiResponse<{ entry?: Record<string, unknown>; error?: unknown }>> {
+    const request = this.buildRequest("POST", `/api/app/establishments/${establishmentId}/daily-entries`, {
+      body,
+    });
+    return this.capture(
+      await postDailyEntryRoute(request, { params: Promise.resolve({ establishmentId }) }),
+    );
+  }
+
+  async listDailyEntries(
+    establishmentId: string,
+    range: { from: string; to: string },
+  ): Promise<ApiResponse<{ entries?: Record<string, unknown>[]; error?: unknown }>> {
+    const request = this.buildRequest(
+      "GET",
+      `/api/app/establishments/${establishmentId}/daily-entries?from=${range.from}&to=${range.to}`,
+    );
+    return this.capture(
+      await listDailyEntriesRoute(request, { params: Promise.resolve({ establishmentId }) }),
+    );
+  }
+
+  async getSummary(
+    establishmentId: string,
+    range: { from: string; to: string },
+  ): Promise<ApiResponse<{ summary?: Record<string, unknown>; error?: unknown }>> {
+    const request = this.buildRequest(
+      "GET",
+      `/api/app/establishments/${establishmentId}/summary?from=${range.from}&to=${range.to}`,
+    );
+    return this.capture(await getSummaryRoute(request, { params: Promise.resolve({ establishmentId }) }));
+  }
+
+  async postRecurringCost(
+    establishmentId: string,
+    body: unknown,
+  ): Promise<ApiResponse<{ recurringCost?: Record<string, unknown>; error?: unknown }>> {
+    const request = this.buildRequest("POST", `/api/app/establishments/${establishmentId}/recurring-costs`, {
+      body,
+    });
+    return this.capture(
+      await postRecurringCostRoute(request, { params: Promise.resolve({ establishmentId }) }),
+    );
+  }
+
+  async listRecurringCosts(
+    establishmentId: string,
+  ): Promise<ApiResponse<{ recurringCosts?: Record<string, unknown>[]; error?: unknown }>> {
+    const request = this.buildRequest("GET", `/api/app/establishments/${establishmentId}/recurring-costs`);
+    return this.capture(
+      await listRecurringCostsRoute(request, { params: Promise.resolve({ establishmentId }) }),
+    );
+  }
+
+  async postGoal(
+    establishmentId: string,
+    body: unknown,
+  ): Promise<ApiResponse<{ goal?: Record<string, unknown>; error?: unknown }>> {
+    const request = this.buildRequest("POST", `/api/app/establishments/${establishmentId}/goals`, { body });
+    return this.capture(await postGoalRoute(request, { params: Promise.resolve({ establishmentId }) }));
+  }
+
+  async getGoalProgress(
+    establishmentId: string,
+    month: string,
+  ): Promise<ApiResponse<{ progress?: Record<string, unknown>; error?: unknown }>> {
+    const request = this.buildRequest(
+      "GET",
+      `/api/app/establishments/${establishmentId}/goals?month=${month}`,
+    );
+    return this.capture(await getGoalRoute(request, { params: Promise.resolve({ establishmentId }) }));
+  }
+
+  async postCheckoutSession(
+    establishmentId: string,
+  ): Promise<ApiResponse<{ url?: string; error?: { code: string; message: string } }>> {
+    const request = this.buildRequest("POST", `/api/app/establishments/${establishmentId}/billing/checkout`);
+    return this.capture(await checkoutRoute(request, { params: Promise.resolve({ establishmentId }) }));
+  }
+
+  async postPortalSession(
+    establishmentId: string,
+  ): Promise<ApiResponse<{ url?: string; error?: { code: string; message: string } }>> {
+    const request = this.buildRequest("POST", `/api/app/establishments/${establishmentId}/billing/portal`);
+    return this.capture(await portalRoute(request, { params: Promise.resolve({ establishmentId }) }));
+  }
+
+  async getSubscriptionStatus(
+    establishmentId: string,
+  ): Promise<ApiResponse<{ subscription?: Record<string, unknown>; error?: unknown }>> {
+    const request = this.buildRequest("GET", `/api/app/establishments/${establishmentId}/subscription`);
+    return this.capture(await getSubscriptionRoute(request, { params: Promise.resolve({ establishmentId }) }));
+  }
+}
+
+/**
+ * Calls the Stripe webhook route directly with a raw (unparsed) body and a
+ * `stripe-signature` header — no cookie jar, no `Origin` check, exactly as
+ * Stripe itself would call it.
+ */
+export async function callWebhook(
+  rawBody: string,
+  signature: string | null,
+): Promise<ApiResponse<{ received?: boolean; error?: { code: string; message: string } }>> {
+  const headers = new Headers({ "content-type": "application/json" });
+  if (signature !== null) headers.set("stripe-signature", signature);
+
+  const request = new NextRequest(`${ORIGIN}/api/billing/webhook`, {
+    method: "POST",
+    headers,
+    body: rawBody,
+  });
+
+  const response = await webhookRoute(request);
+  const text = await response.text();
+  return {
+    status: response.status,
+    body: (text ? JSON.parse(text) : null) as { received?: boolean; error?: { code: string; message: string } },
+    headers: response.headers,
+  };
 }
 
 /** A complete, valid set of answers for the mandatory base scenario. */
@@ -181,4 +360,48 @@ export async function seedCompletedAnswers(
   });
 
   return { id, answersVersion: patched.body.answersVersion ?? 1 };
+}
+
+/**
+ * Walks a brand-new `TestClient` all the way to a logged-in app session
+ * that owns one establishment — the setup every tracking-engine
+ * integration test needs, built from the same real routes a browser would
+ * hit (complete a diagnostic, activate an account, click the magic link).
+ */
+export async function createLoggedInEstablishment(
+  client: TestClient,
+  overrides: { email?: string; establishmentName?: string } = {},
+): Promise<{ establishmentId: string }> {
+  const diagnosticId = await (async () => {
+    const { id, answersVersion } = await seedCompletedAnswers(client);
+    const finalized = await client.finalize(id, {
+      expectedVersion: answersVersion,
+      idempotencyKey: idempotencyKey(id),
+      contact: VALID_CONTACT,
+    });
+    if (finalized.status !== 200) throw new Error("Falha ao concluir diagnóstico de teste");
+    return id;
+  })();
+
+  const email = overrides.email ?? `dono-${diagnosticId}@example.com`;
+  const activated = await client.activateAccount(diagnosticId, {
+    email,
+    establishmentName: overrides.establishmentName ?? "Estabelecimento de Teste",
+  });
+  if (activated.status !== 200 || !activated.body.devVerifyUrl) {
+    throw new Error("Falha ao ativar conta de teste");
+  }
+
+  const token = new URL(activated.body.devVerifyUrl, "http://localhost").searchParams.get("token");
+  if (!token) throw new Error("Link de verificação de teste sem token");
+
+  const verified = await client.verifyMagicLink(token);
+  if (verified.status !== 200) throw new Error("Falha ao verificar link mágico de teste");
+
+  const [row] = await db.execute<{ establishment_id: string }>(
+    sql`SELECT establishment_id FROM diagnostics WHERE id = ${diagnosticId}`,
+  );
+  if (!row?.establishment_id) throw new Error("Diagnóstico de teste sem estabelecimento vinculado");
+
+  return { establishmentId: row.establishment_id };
 }

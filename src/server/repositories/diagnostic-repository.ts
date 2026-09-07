@@ -12,6 +12,7 @@ export type Executor = Database | Parameters<Parameters<Database["transaction"]>
 
 export interface DiagnosticRow {
   id: string;
+  establishmentId: string | null;
   sourceDiagnosticId: string | null;
   draftSessionHash: string;
   leadId: string | null;
@@ -87,6 +88,17 @@ export async function bumpAnswersVersion(
     .returning({ answersVersion: diagnostics.answersVersion });
 
   return row?.answersVersion ?? null;
+}
+
+/** Links a completed diagnostic to the establishment created from it. Additive, idempotent. */
+export async function linkEstablishment(
+  db: Executor,
+  input: { id: string; establishmentId: string },
+): Promise<void> {
+  await db
+    .update(diagnostics)
+    .set({ establishmentId: input.establishmentId, updatedAt: new Date() })
+    .where(eq(diagnostics.id, input.id));
 }
 
 export async function updateProfile(

@@ -1,0 +1,1 @@
+ALTER TABLE "cost_categories" ADD CONSTRAINT "cost_categories_establishment_name_kind_unique" UNIQUE("establishment_id","name","kind");

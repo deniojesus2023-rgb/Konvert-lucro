@@ -129,6 +129,178 @@ export function reviseDiagnostic(id: string): Promise<ReviseResponse> {
   return request(`/api/raio-x/${id}/revise`, { method: "POST" });
 }
 
+export interface ActivateAccountBody {
+  email: string;
+  establishmentName: string;
+}
+
+export interface ActivateAccountResponse {
+  message: string;
+  devVerifyUrl?: string;
+}
+
+export function activateAccount(id: string, body: ActivateAccountBody): Promise<ActivateAccountResponse> {
+  return request(`/api/raio-x/${id}/activate-account`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export interface DailyEntryPayload {
+  entryDate: string;
+  channelName?: string | null;
+  grossRevenueCents: number;
+  ordersCount: number;
+  discountsCents: number;
+  cancellationsCents: number;
+  knownFeesCents: number;
+  expectedVersion?: number;
+}
+
+export interface DailyEntryView {
+  id: string;
+  entryDate: string;
+  channelId: string | null;
+  grossRevenueCents: number;
+  ordersCount: number;
+  discountsCents: number;
+  cancellationsCents: number;
+  knownFeesCents: number;
+  entriesVersion: number;
+}
+
+export function upsertDailyEntry(
+  establishmentId: string,
+  body: DailyEntryPayload,
+): Promise<{ entry: DailyEntryView }> {
+  return request(`/api/app/establishments/${establishmentId}/daily-entries`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function listDailyEntries(
+  establishmentId: string,
+  range: { from: string; to: string },
+): Promise<{ entries: DailyEntryView[] }> {
+  return request(
+    `/api/app/establishments/${establishmentId}/daily-entries?from=${range.from}&to=${range.to}`,
+    { method: "GET" },
+  );
+}
+
+export type TrackingMetric<T> =
+  | { status: "available"; value: T }
+  | {
+      status: "unavailable";
+      reason: "exceeds_safe_range" | "zero_orders" | "non_positive_revenue" | "no_goal" | "no_prior_period";
+    };
+
+export interface PeriodSummary {
+  formulaVersion: string;
+  netRevenueCents: number;
+  totalCostsCents: number;
+  profit: TrackingMetric<number>;
+  marginBps: TrackingMetric<number>;
+  profitPerOrder: TrackingMetric<number>;
+  takeHomePer100Cents: TrackingMetric<number>;
+}
+
+export function getPeriodSummary(
+  establishmentId: string,
+  range: { from: string; to: string },
+): Promise<{ summary: PeriodSummary }> {
+  return request(`/api/app/establishments/${establishmentId}/summary?from=${range.from}&to=${range.to}`, {
+    method: "GET",
+  });
+}
+
+export interface RecurringCostPayload {
+  categoryName: string;
+  name: string;
+  amountCents: number;
+  frequency: "monthly" | "weekly";
+  startDate: string;
+  endDate?: string | null;
+}
+
+export interface RecurringCostView {
+  id: string;
+  name: string;
+  amountCents: number;
+  frequency: "monthly" | "weekly";
+  startDate: string;
+  endDate: string | null;
+  active: boolean;
+}
+
+export function createRecurringCost(
+  establishmentId: string,
+  body: RecurringCostPayload,
+): Promise<{ recurringCost: RecurringCostView }> {
+  return request(`/api/app/establishments/${establishmentId}/recurring-costs`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function listRecurringCosts(
+  establishmentId: string,
+): Promise<{ recurringCosts: RecurringCostView[] }> {
+  return request(`/api/app/establishments/${establishmentId}/recurring-costs`, { method: "GET" });
+}
+
+export interface GoalPayload {
+  periodStart: string;
+  profitGoalCents?: number | null;
+  revenueGoalCents?: number | null;
+  marginGoalBps?: number | null;
+}
+
+export interface GoalView {
+  periodStart: string;
+  profitGoalCents: number | null;
+  revenueGoalCents: number | null;
+  marginGoalBps: number | null;
+}
+
+export function upsertGoal(establishmentId: string, body: GoalPayload): Promise<{ goal: GoalView }> {
+  return request(`/api/app/establishments/${establishmentId}/goals`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export interface GoalProgress {
+  summary: PeriodSummary;
+  profitGoalCents: number | null;
+  gapToGoal: TrackingMetric<number>;
+}
+
+export function getGoalProgress(establishmentId: string, month: string): Promise<{ progress: GoalProgress }> {
+  return request(`/api/app/establishments/${establishmentId}/goals?month=${month}`, { method: "GET" });
+}
+
+export interface SubscriptionStatusView {
+  status: "trialing" | "active" | "past_due" | "canceled" | "incomplete" | "none";
+  isActive: boolean;
+  currentPeriodEnd: string | null;
+}
+
+export function getSubscriptionStatus(
+  establishmentId: string,
+): Promise<{ subscription: SubscriptionStatusView }> {
+  return request(`/api/app/establishments/${establishmentId}/subscription`, { method: "GET" });
+}
+
+export function startCheckout(establishmentId: string): Promise<{ url: string }> {
+  return request(`/api/app/establishments/${establishmentId}/billing/checkout`, { method: "POST" });
+}
+
+export function openBillingPortal(establishmentId: string): Promise<{ url: string }> {
+  return request(`/api/app/establishments/${establishmentId}/billing/portal`, { method: "POST" });
+}
+
 export interface SendEventBody {
   eventName: FunnelEventName;
   diagnosticId?: string;

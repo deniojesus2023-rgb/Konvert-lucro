@@ -22,6 +22,15 @@ if (!url) {
 process.env.DATABASE_URL = url;
 process.env.APP_ORIGIN = process.env.APP_ORIGIN ?? "http://localhost:3000";
 process.env.CONSENT_TEXT_VERSION = process.env.CONSENT_TEXT_VERSION ?? "test.v1";
+// Dummy but well-formed Stripe config: enough to exercise the webhook's
+// local signature verification and every guard that runs before a real
+// network call to Stripe would happen. No test in this suite triggers an
+// actual Stripe API call (checkout/portal creation) — this sandbox has no
+// network access to Stripe and no real account, so those two remain
+// verified only up to their pre-Stripe authorization guards.
+process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? "sk_test_dummy";
+process.env.STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_test_dummy_secret";
+process.env.STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID ?? "price_test_dummy";
 resetEnvCache();
 
 const db = setDbForTesting(url);
@@ -29,7 +38,7 @@ const db = setDbForTesting(url);
 beforeEach(async () => {
   // A single statement so the truncation is atomic and FK-order-proof.
   await db.execute(
-    sql`TRUNCATE TABLE funnel_events, diagnostic_results, diagnostic_answers, diagnostics, consents, leads RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE TABLE funnel_events, diagnostic_results, diagnostic_answers, diagnostics, consents, leads, billing_webhook_events, subscriptions, goals, recurring_costs, variable_costs, daily_entries, cost_categories, sales_channels, establishment_members, login_tokens, establishments, users RESTART IDENTITY CASCADE`,
   );
   resetRateLimit();
 });

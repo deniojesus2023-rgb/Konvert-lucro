@@ -18,6 +18,8 @@ export type ApiErrorCode =
   | "not_completed"
   | "incomplete_diagnostic"
   | "rate_limited"
+  | "unauthorized"
+  | "invalid_signature"
   | "internal_error";
 
 const STATUS_BY_CODE: Record<ApiErrorCode, number> = {
@@ -32,6 +34,8 @@ const STATUS_BY_CODE: Record<ApiErrorCode, number> = {
   not_completed: 409,
   incomplete_diagnostic: 422,
   rate_limited: 429,
+  unauthorized: 401,
+  invalid_signature: 400,
   internal_error: 500,
 };
 
@@ -93,4 +97,10 @@ export async function handleRoute(
  * so an attacker can't tell "exists but not yours" from "doesn't exist". */
 export function notFound(): ApiError {
   return new ApiError("not_found", "Não encontrado");
+}
+
+/** No app session at all — distinct from `notFound()`, which guards
+ * ownership of a specific resource once a caller is authenticated. */
+export function unauthorized(): ApiError {
+  return new ApiError("unauthorized", "Não autenticado");
 }

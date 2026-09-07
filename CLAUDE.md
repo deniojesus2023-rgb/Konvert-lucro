@@ -2,10 +2,28 @@
 
 ## Fase
 
-Atual: **1B** (banco, persistência, segurança e APIs). A Fase 1A (motor
-financeiro) está aprovada e congelada. Ainda não existem telas: landing,
-wizard, resultado visual, oferta, checkout, assinatura e autenticação de
-usuário são Fase 1C+ — não reintroduza nada disso sem que o escopo mude.
+Atual: **Fase 5 completa** — diagnóstico gratuito ("Raio-X do Lucro", Fases
+1A-1C) + produto pago de acompanhamento contínuo ("Inteligência de lucro
+para delivery", Fases 0-5: contas, lançamento diário, custos
+recorrentes/metas/comparação de período, assinatura via Stripe). Fase 1A
+(motor financeiro do diagnóstico) segue congelada — não altere sem
+necessidade documentada. Fase 6 (análises avançadas, alertas, simulador,
+histórico, importação CSV, integrações iFood/PDV) está **fora de escopo**
+por decisão explícita do plano técnico — não implemente nada disso sem que
+o escopo mude.
+
+### Duas famílias de motor, deliberadamente separadas
+
+- `src/domain/diagnostic/` — o motor do diagnóstico gratuito (Fase 1A),
+  opera sobre um `DiagnosticInput` único (uma resposta por pergunta, com
+  `ResponseState` de 6 estados). **Congelado.**
+- `src/domain/tracking/` — o motor de acompanhamento contínuo (Fase 3+),
+  opera sobre um `PeriodInput` agregado de lançamentos reais (`daily_entries`
+  + `variable_costs` + `recurring_costs` prorateados). Não tem estados
+  "unknown"/"estimated" — uma linha existe ou não existe. Tem seu próprio
+  `Metric<T>` e `TRACKING_FORMULA_VERSION`, **não** importa nada de
+  `domain/diagnostic/`. Não funda os dois motores nem reintroduza o
+  `ResponseState` do diagnóstico aqui.
 
 ## Regras do domínio (Fase 1A — não alterar sem necessidade documentada)
 
@@ -24,7 +42,7 @@ usuário são Fase 1C+ — não reintroduza nada disso sem que o escopo mude.
 - Fórmulas, arredondamentos e `FORMULA_VERSION` só mudam com necessidade
   real e documentada em `docs/formulas.md` (bump da versão junto).
 
-## Regras da camada de servidor (Fase 1B)
+## Regras da camada de servidor (Fase 1B, diagnóstico gratuito)
 
 - Camadas separadas: rota (HTTP/cookie/status) → service (regra +
   transação) → repository (Drizzle) → domain (cálculo). **Nenhuma regra
@@ -60,6 +78,52 @@ usuário são Fase 1C+ — não reintroduza nada disso sem que o escopo mude.
 - `diagnostics.source_diagnostic_id` é uma foreign key real
   (`ON DELETE RESTRICT`) para `diagnostics.id` — não volte a deixá-la como
   UUID solto.
+
+## Regras do produto pago (Fases 0-5)
+
+- **Sessão de app é separada da sessão do diagnóstico**: cookie
+  `konvert_app_session` (login por magic-link) nunca se mistura com
+  `konvert_raiox_session` (edição de um rascunho anônimo). Mesma disciplina
+  de segredo-no-cookie/hash-no-banco/comparação em tempo constante.
+- **Autorização por membership, nunca por dono implícito**: qualquer rota
+  sob `/api/app/establishments/[establishmentId]/...` chama
+  `assertMembership` antes de tocar dado nenhum. Um usuário que não é
+  membro recebe **404**, nunca 403 — mesma lógica anti-enumeração da sessão
+  do diagnóstico, agora sobre `establishmentId` em vez de `diagnosticId`.
+- **`daily_entries` usa bloqueio otimista** (`entriesVersion`), mesmo padrão
+  de `answers_version`: a checagem vive no `WHERE` do `UPDATE`, uma edição
+  sem `expectedVersion` contra uma linha existente é rejeitada (409), nunca
+  sobrescrita silenciosa.
+- **Nunca armazene o que pode ser derivado**: a distribuição de um custo
+  recorrente por período (`prorateRecurringCost`) é sempre calculada sob
+  demanda a partir de `recurring_costs`, nunca persistida como valor
+  pronto — mesma filosofia de `diagnostic_results` guardar só o resultado
+  final, não passos intermediários.
+- **`subscriptions` é append-only**: uma transição de status do Stripe
+  nunca faz `UPDATE`, sempre `INSERT` de uma nova linha
+  (`insertSubscriptionEvent`). O status atual é sempre "a linha mais
+  recente por `provider_event_at`", nunca uma coluna mutável.
+- **Guarda de monotonicidade em `provider_event_at`**: antes de gravar um
+  evento de assinatura, `recordSubscriptionEvent` compara o timestamp do
+  evento (não "agora") com o da última linha gravada — um evento mais
+  antigo que já chegou fora de ordem é descartado, nunca regride o status.
+- **Webhook do Stripe é idempotente por construção**: `tryClaimWebhookEvent`
+  faz `INSERT ... ON CONFLICT DO NOTHING` em `billing_webhook_events` antes
+  de interpretar o payload — uma redelivery do mesmo `event.id` nunca
+  reaplica nada, mesmo sob concorrência. Não mova essa checagem para depois
+  de decidir o tipo do evento.
+- **A rota do webhook nunca usa `readJsonBody`**: o Stripe assina os bytes
+  crus da requisição; ela lê `request.text()` e passa a string exata para
+  `stripe.webhooks.constructEvent`. Re-serializar via `JSON.parse`/
+  `JSON.stringify` antes invalida a assinatura. Também não há checagem de
+  `Origin` nessa rota — quem chama é o Stripe, não um navegador; a
+  assinatura é toda a fronteira de confiança.
+- **`getStripeEnv()`/`getStripeClient()` são lazy** como `getEnv()`/`getDb()`:
+  `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_ID` são
+  opcionais no schema de ambiente para que `pnpm build` e toda rota que não
+  seja de cobrança continuem funcionando sem nenhuma conta Stripe
+  configurada. O erro de "Stripe não configurado" só acontece na hora de
+  efetivamente iniciar um checkout/portal — nunca no import do módulo.
 
 ## Antes de considerar algo pronto
 
