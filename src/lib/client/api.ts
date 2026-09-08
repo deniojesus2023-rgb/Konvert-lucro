@@ -161,6 +161,7 @@ export interface DailyEntryView {
   id: string;
   entryDate: string;
   channelId: string | null;
+  channelName: string | null;
   grossRevenueCents: number;
   ordersCount: number;
   discountsCents: number;
@@ -299,6 +300,57 @@ export function startCheckout(establishmentId: string): Promise<{ url: string }>
 
 export function openBillingPortal(establishmentId: string): Promise<{ url: string }> {
   return request(`/api/app/establishments/${establishmentId}/billing/portal`, { method: "POST" });
+}
+
+export interface CreateEstablishmentBody {
+  name: string;
+}
+
+export interface CreateEstablishmentResponse {
+  establishment: { id: string; name: string; timezone: string };
+}
+
+export function createEstablishment(body: CreateEstablishmentBody): Promise<CreateEstablishmentResponse> {
+  return request("/api/app/establishments", { method: "POST", body: JSON.stringify(body) });
+}
+
+export interface VariableCostPayload {
+  costDate: string;
+  categoryName: string;
+  amountCents: number;
+  note?: string | null;
+}
+
+export interface VariableCostView {
+  id: string;
+  costDate: string;
+  categoryName: string;
+  amountCents: number;
+  note: string | null;
+}
+
+export function createVariableCost(
+  establishmentId: string,
+  body: VariableCostPayload,
+): Promise<{ variableCost: VariableCostView }> {
+  return request(`/api/app/establishments/${establishmentId}/variable-costs`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function listVariableCosts(
+  establishmentId: string,
+  range: { from: string; to: string },
+): Promise<{ variableCosts: VariableCostView[] }> {
+  return request(
+    `/api/app/establishments/${establishmentId}/variable-costs?from=${range.from}&to=${range.to}`,
+    { method: "GET" },
+  );
+}
+
+export function deleteVariableCost(establishmentId: string, costId: string): Promise<{ ok: true }> {
+  return request(`/api/app/establishments/${establishmentId}/variable-costs/${costId}`, { method: "DELETE" });
 }
 
 export interface SendEventBody {

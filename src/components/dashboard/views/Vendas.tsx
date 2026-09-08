@@ -5,53 +5,58 @@ import { useDashboard } from "../DashboardContext";
 import { useDashboardData } from "../DashboardDataContext";
 import { DatePickerButton, FilterButton, SearchIcon, TabGroup } from "../shared";
 import { RowMenu } from "../RowMenu";
-import { VendaForm } from "../forms/VendaForm";
+import { VendaForm, type VendaFormEditTarget } from "../forms/VendaForm";
 import { downloadCsv } from "../csv";
-import { vendasPaginas } from "../data";
+import { formatCurrencyDisplay } from "@/lib/client/currency";
 
-const TABS = ["Todos", "Delivery", "Balcão", "Retirada"];
-
-function matchesTab(canal: string, tab: string): boolean {
-  if (tab === "Todos") return true;
-  if (tab === "Balcão") return canal === "Balcão";
-  if (tab === "Delivery") return canal === "iFood" || canal === "WhatsApp" || canal === "Delivery próprio";
-  // "Retirada" has no matching demo channel yet — a real filter that
-  // honestly shows "nothing" instead of faking a match.
-  return false;
-}
+const TABS = ["Todos", "iFood", "WhatsApp", "Balcão", "Delivery próprio"];
 
 export function Vendas({ isActive }: { isActive: boolean }) {
-  const { goTo, toast } = useDashboard();
-  const { vendas, removeVenda } = useDashboardData();
+  const { toast } = useDashboard();
+  const { vendas, summary } = useDashboardData();
   const [tab, setTab] = useState(TABS[0]);
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<VendaFormEditTarget | null>(null);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return vendas.filter((v) => {
-      if (!matchesTab(v.canal, tab)) return false;
+      if (tab !== "Todos" && v.canal !== tab) return false;
       if (!term) return true;
-      return v.cliente.toLowerCase().includes(term) || v.pedido.toLowerCase().includes(term) || v.valor.toLowerCase().includes(term);
+      return v.canal.toLowerCase().includes(term) || v.data.includes(term);
     });
   }, [vendas, tab, search]);
+
+  const totalPedidos = vendas.reduce((sum, v) => sum + v.pedidos, 0);
+  const ticketMedioGeral = summary && summary.netRevenueCents > 0 && totalPedidos > 0 ? formatCurrencyDisplay(Math.round(summary.netRevenueCents / totalPedidos)) : "—";
+
+  function openNewForm() {
+    setEditTarget(null);
+    setFormOpen(true);
+  }
+
+  function openEditForm(entryDate: string, canal: string, entriesVersion: number) {
+    setEditTarget({ entryDate, canal, entriesVersion });
+    setFormOpen(true);
+  }
 
   function handleExport() {
     downloadCsv(
       "vendas.csv",
-      ["Pedido", "Data e hora", "Cliente", "Canal", "Itens", "Valor", "Status"],
-      filtered.map((v) => [v.pedido, v.dataHora, v.cliente, v.canal, v.itens, v.valor, v.status]),
+      ["Data", "Canal", "Faturamento", "Pedidos", "Ticket médio"],
+      filtered.map((v) => [v.data, v.canal, v.faturamento, String(v.pedidos), v.ticketMedio]),
     );
     toast("Vendas exportadas.");
   }
 
   return (
     <section className={`view${isActive ? " active" : ""}`} id="view-vendas">
-      <VendaForm open={formOpen} onClose={() => setFormOpen(false)} />
+      <VendaForm open={formOpen} onClose={() => setFormOpen(false)} editTarget={editTarget} />
       <div className="page-head">
         <div>
           <h1>Vendas</h1>
-          <p>Acompanhe todas as suas vendas e pedidos.</p>
+          <p>Lançamentos diários de vendas, por canal.</p>
         </div>
         <div className="head-actions">
           <DatePickerButton />
@@ -63,43 +68,31 @@ export function Vendas({ isActive }: { isActive: boolean }) {
             </svg>
             Exportar
           </button>
-          <button className="btn btn-primary" onClick={() => setFormOpen(true)}>
+          <button className="btn btn-primary" onClick={openNewForm}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M12 5v14M5 12h14" />
             </svg>
-            Registrar venda
+            Lançar vendas do dia
           </button>
         </div>
       </div>
 
       <div className="grid grid-4" style={{ marginBottom: 20 }}>
         <div className="card stat-card">
-          <div className="label">Total em vendas</div>
-          <div className="value">R$ 50.000,00</div>
-          <div className="delta up">
-            ▲ +12% <span className="sub">vs. período anterior</span>
-          </div>
+          <div className="label">Total em vendas (mês)</div>
+          <div className="value">{summary ? formatCurrencyDisplay(summary.netRevenueCents) : "—"}</div>
         </div>
         <div className="card stat-card">
-          <div className="label">Total de pedidos</div>
-          <div className="value">1.000</div>
-          <div className="delta up">
-            ▲ +8% <span className="sub">vs. período anterior</span>
-          </div>
+          <div className="label">Total de pedidos (mês)</div>
+          <div className="value">{totalPedidos.toLocaleString("pt-BR")}</div>
         </div>
         <div className="card stat-card">
-          <div className="label">Ticket médio</div>
-          <div className="value">R$ 50,00</div>
-          <div className="delta up">
-            ▲ +4% <span className="sub">vs. período anterior</span>
-          </div>
+          <div className="label">Ticket médio (mês)</div>
+          <div className="value">{ticketMedioGeral}</div>
         </div>
         <div className="card stat-card">
-          <div className="label">Pedidos cancelados</div>
-          <div className="value">20</div>
-          <div className="delta down">
-            ▼ -5% <span className="sub">vs. período anterior</span>
-          </div>
+          <div className="label">Lucro do mês</div>
+          <div className="value">{summary && summary.profit.status === "available" ? formatCurrencyDisplay(summary.profit.value) : "—"}</div>
         </div>
       </div>
 
@@ -110,7 +103,7 @@ export function Vendas({ isActive }: { isActive: boolean }) {
             <SearchIcon />
             <input
               type="text"
-              placeholder="Buscar por cliente, pedido ou valor..."
+              placeholder="Buscar por canal ou data..."
               id="vendas-search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -122,35 +115,29 @@ export function Vendas({ isActive }: { isActive: boolean }) {
           <table id="vendas-table">
             <tbody>
               <tr>
-                <th>Pedido</th>
-                <th>Data e hora</th>
-                <th>Cliente</th>
+                <th>Data</th>
                 <th>Canal</th>
-                <th>Itens</th>
-                <th>Valor</th>
-                <th>Status</th>
+                <th>Faturamento</th>
+                <th>Pedidos</th>
+                <th>Ticket médio</th>
                 <th></th>
               </tr>
               {filtered.map((v) => (
-                <tr key={v.pedido}>
-                  <td style={{ fontWeight: 600 }}>{v.pedido}</td>
-                  <td>{v.dataHora}</td>
-                  <td>{v.cliente}</td>
+                <tr key={v.id}>
+                  <td style={{ fontWeight: 600 }}>{v.data}</td>
                   <td>{v.canal}</td>
-                  <td>{v.itens}</td>
-                  <td style={{ fontWeight: 600 }}>{v.valor}</td>
+                  <td style={{ fontWeight: 600 }}>{v.faturamento}</td>
+                  <td>{v.pedidos}</td>
+                  <td>{v.ticketMedio}</td>
                   <td>
-                    <span className={`badge ${v.status === "Entregue" ? "badge-green" : "badge-red"}`}>{v.status}</span>
-                  </td>
-                  <td>
-                    <RowMenu onDelete={() => removeVenda(v.pedido)} />
+                    <RowMenu onEdit={() => openEditForm(v.entryDate, v.canal, v.entriesVersion)} />
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", color: "var(--text-muted)" }}>
-                    Nenhuma venda encontrada.
+                  <td colSpan={6} style={{ textAlign: "center", color: "var(--text-muted)" }}>
+                    Nenhum lançamento encontrado neste mês.
                   </td>
                 </tr>
               )}
@@ -158,22 +145,8 @@ export function Vendas({ isActive }: { isActive: boolean }) {
           </table>
         </div>
         <div className="pagination">
-          <div className="pg-buttons" id="vendas-pg">
-            {vendasPaginas.map((p, i) => (
-              <div key={`${p}-${i}`} className={`pg-btn${i === 0 ? " active" : ""}`} onClick={() => toast(`Página ${p} (demonstração)`)}>
-                {p}
-              </div>
-            ))}
-          </div>
-          <div className="pg-count">Mostrando {filtered.length} de 1.000 pedidos</div>
+          <div className="pg-count">Mostrando {filtered.length} de {vendas.length} lançamentos deste mês</div>
         </div>
-      </div>
-
-      <div className="banner" style={{ background: "var(--primary-light)", borderColor: "#D6E1FB", color: "var(--primary-dark)", marginTop: 20 }}>
-        <span>📈 Suas vendas cresceram 12% em relação ao período anterior.</span>
-        <span className="link" style={{ color: "var(--primary-dark)" }} onClick={() => goTo("resultados")}>
-          Ver mais detalhes →
-        </span>
       </div>
     </section>
   );

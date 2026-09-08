@@ -2,12 +2,21 @@
 
 import { useState } from "react";
 import { useDashboard } from "../DashboardContext";
+import { useDashboardData } from "../DashboardDataContext";
 import { DatePickerButton } from "../shared";
 import { VendaForm } from "../forms/VendaForm";
+import { formatCurrencyDisplay } from "@/lib/client/currency";
 
 export function Overview({ isActive }: { isActive: boolean }) {
   const { goTo } = useDashboard();
+  const { summary, vendas, metas, profitGoalCents } = useDashboardData();
   const [formOpen, setFormOpen] = useState(false);
+
+  const totalPedidos = vendas.reduce((sum, v) => sum + v.pedidos, 0);
+  const lucro = summary?.profit.status === "available" ? summary.profit.value : 0;
+  const lucroPorPedido = summary?.profitPerOrder.status === "available" ? summary.profitPerOrder.value : null;
+  const margemPct = summary?.marginBps.status === "available" ? (summary.marginBps.value / 100).toFixed(0) : "—";
+  const meta = metas[0];
 
   return (
     <section className={`view${isActive ? " active" : ""}`} id="view-overview">
@@ -77,40 +86,37 @@ export function Overview({ isActive }: { isActive: boolean }) {
 
       <div className="banner">
         <span>
-          <b>Dados informados até 28 jun.</b> · Confira os últimos 2 dias.
+          <b>Mês corrente</b> · {vendas.length} lançamento{vendas.length === 1 ? "" : "s"} registrados até hoje.
         </span>
-        <span className="link" onClick={() => goTo("importacoes")}>
-          Atualizar dados →
+        <span className="link" onClick={() => goTo("vendas")}>
+          Ver lançamentos →
         </span>
       </div>
 
       <div className="grid grid-4" style={{ marginBottom: 20 }}>
         <div className="card stat-card">
           <div className="label">Vendas informadas</div>
-          <div className="value">R$ 50.000,00</div>
+          <div className="value">{summary ? formatCurrencyDisplay(summary.netRevenueCents) : "—"}</div>
           <div className="sub" style={{ fontSize: 12.5 }}>
-            1.000 pedidos
+            {totalPedidos.toLocaleString("pt-BR")} pedidos
           </div>
         </div>
         <div className="card stat-card">
           <div className="label">Custos informados</div>
-          <div className="value">R$ 40.000,00</div>
-          <div className="sub" style={{ fontSize: 12.5 }}>
-            80% das vendas
-          </div>
+          <div className="value">{summary ? formatCurrencyDisplay(summary.totalCostsCents) : "—"}</div>
         </div>
         <div className="card stat-card">
           <div className="label">Lucro estimado</div>
-          <div className="value blue">R$ 10.000,00</div>
+          <div className="value blue">{summary?.profit.status === "available" ? formatCurrencyDisplay(lucro) : "Indisponível"}</div>
           <div className="sub" style={{ fontSize: 12.5 }}>
-            Margem de 20%
+            Margem de {margemPct === "—" ? "—" : `${margemPct}%`}
           </div>
         </div>
         <div className="card stat-card">
           <div className="label">Lucro por pedido</div>
-          <div className="value">R$ 10,00</div>
+          <div className="value">{lucroPorPedido !== null ? formatCurrencyDisplay(lucroPorPedido) : "Indisponível"}</div>
           <div className="sub" style={{ fontSize: 12.5 }}>
-            Média do período
+            Média do mês
           </div>
         </div>
       </div>
@@ -143,14 +149,23 @@ export function Overview({ isActive }: { isActive: boolean }) {
         <div className="card section-block">
           <div className="section-title">Meta de lucro</div>
           <div style={{ fontSize: 22, fontWeight: 700, margin: "14px 0 4px" }}>
-            R$10.000 <span style={{ color: "var(--text-muted)", fontWeight: 500, fontSize: 15 }}>de R$12.000</span>
+            {formatCurrencyDisplay(lucro)}{" "}
+            {profitGoalCents !== null && (
+              <span style={{ color: "var(--text-muted)", fontWeight: 500, fontSize: 15 }}>de {formatCurrencyDisplay(profitGoalCents)}</span>
+            )}
           </div>
           <div className="progress-track">
-            <div className="progress-fill" style={{ width: "83%" }}></div>
+            <div className="progress-fill" style={{ width: `${meta.progresso}%` }}></div>
           </div>
           <div className="progress-row">
-            <span>Faltam R$2.000,00 para a meta.</span>
-            <span style={{ fontWeight: 700, color: "var(--text)" }}>83%</span>
+            <span>
+              {profitGoalCents === null
+                ? "Nenhuma meta definida ainda."
+                : profitGoalCents - lucro > 0
+                  ? `Faltam ${formatCurrencyDisplay(profitGoalCents - lucro)} para a meta.`
+                  : "Meta atingida!"}
+            </span>
+            <span style={{ fontWeight: 700, color: "var(--text)" }}>{meta.progresso}%</span>
           </div>
           <div className="divider-line"></div>
           <span className="link" onClick={() => goTo("metas")}>

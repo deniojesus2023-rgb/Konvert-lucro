@@ -7,8 +7,9 @@ import { RowMenu } from "../RowMenu";
 import { MetaForm } from "../forms/MetaForm";
 
 export function Metas({ isActive }: { isActive: boolean }) {
-  const { metas, removeMeta } = useDashboardData();
+  const { metas, profitGoalCents, setProfitGoal } = useDashboardData();
   const [formOpen, setFormOpen] = useState(false);
+  const meta = metas[0];
 
   return (
     <section className={`view${isActive ? " active" : ""}`} id="view-metas">
@@ -24,62 +25,23 @@ export function Metas({ isActive }: { isActive: boolean }) {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M12 5v14M5 12h14" />
             </svg>
-            Nova meta
+            Editar meta
           </button>
         </div>
       </div>
 
       <div className="grid grid-4" style={{ marginBottom: 20 }}>
         <div className="card stat-card">
-          <div className="label">Meta de receita</div>
-          <div className="value">R$ 60.000,00</div>
+          <div className="label">Meta de lucro do mês</div>
+          <div className="value">{meta.valorMeta}</div>
           <div className="progress-track" style={{ marginTop: 8 }}>
-            <div className="progress-fill" style={{ width: "80%" }}></div>
+            <div className="progress-fill" style={{ width: `${meta.progresso}%` }}></div>
           </div>
           <div className="sub" style={{ fontSize: 12.5 }}>
-            80% concluída
+            {meta.progresso}% concluída
           </div>
           <div className="sub" style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            R$ 48.000 de R$ 60.000
-          </div>
-        </div>
-        <div className="card stat-card">
-          <div className="label">Meta de pedidos</div>
-          <div className="value">1.200</div>
-          <div className="progress-track" style={{ marginTop: 8 }}>
-            <div className="progress-fill" style={{ width: "67%" }}></div>
-          </div>
-          <div className="sub" style={{ fontSize: 12.5 }}>
-            67% concluída
-          </div>
-          <div className="sub" style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            800 de 1.200
-          </div>
-        </div>
-        <div className="card stat-card">
-          <div className="label">Ticket médio</div>
-          <div className="value">R$ 55,00</div>
-          <div className="progress-track" style={{ marginTop: 8 }}>
-            <div className="progress-fill" style={{ width: "91%" }}></div>
-          </div>
-          <div className="sub" style={{ fontSize: 12.5 }}>
-            91% concluída
-          </div>
-          <div className="sub" style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            R$ 50,00 de R$ 55,00
-          </div>
-        </div>
-        <div className="card stat-card">
-          <div className="label">Margem de lucro</div>
-          <div className="value">25%</div>
-          <div className="progress-track" style={{ marginTop: 8 }}>
-            <div className="progress-fill" style={{ width: "60%" }}></div>
-          </div>
-          <div className="sub" style={{ fontSize: 12.5 }}>
-            60% concluída
-          </div>
-          <div className="sub" style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            20% de 25%
+            {meta.valorAtual} de {meta.valorMeta}
           </div>
         </div>
       </div>
@@ -115,7 +77,7 @@ export function Metas({ isActive }: { isActive: boolean }) {
                     <span className="badge badge-blue">Em andamento</span>
                   </td>
                   <td>
-                    <RowMenu onDelete={() => removeMeta(m.nome)} />
+                    <RowMenu onEdit={() => setFormOpen(true)} onDelete={profitGoalCents !== null ? () => void setProfitGoal(null) : undefined} deleteLabel="Limpar meta" />
                   </td>
                 </tr>
               ))}

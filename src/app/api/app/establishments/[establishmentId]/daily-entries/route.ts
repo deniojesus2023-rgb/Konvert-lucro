@@ -9,6 +9,7 @@ import { upsertDailyEntry } from "@/server/services/upsert-daily-entry";
 import { getDb } from "@/server/db/client";
 import { assertMembership } from "@/server/services/establishment-membership";
 import { listDailyEntriesInRange } from "@/server/repositories/daily-entry-repository";
+import { listSalesChannels } from "@/server/repositories/sales-channel-repository";
 import { centsFromDb } from "@/server/db/money-codec";
 
 export const dynamic = "force-dynamic";
@@ -45,11 +46,15 @@ export async function GET(
     const db = getDb();
     await assertMembership(db, { establishmentId: parsedId.data, userId: user.id });
 
-    const rows = await listDailyEntriesInRange(db, {
-      establishmentId: parsedId.data,
-      fromDate: query.data.from,
-      toDate: query.data.to,
-    });
+    const [rows, channels] = await Promise.all([
+      listDailyEntriesInRange(db, {
+        establishmentId: parsedId.data,
+        fromDate: query.data.from,
+        toDate: query.data.to,
+      }),
+      listSalesChannels(db, parsedId.data),
+    ]);
+    const channelNameById = new Map(channels.map((channel) => [channel.id, channel.name]));
 
     return NextResponse.json(
       {
@@ -57,6 +62,7 @@ export async function GET(
           id: row.id,
           entryDate: row.entryDate,
           channelId: row.salesChannelId,
+          channelName: row.salesChannelId ? (channelNameById.get(row.salesChannelId) ?? null) : null,
           grossRevenueCents: centsFromDb(row.grossRevenueCents) ?? 0,
           ordersCount: row.ordersCount,
           discountsCents: centsFromDb(row.discountsCents) ?? 0,

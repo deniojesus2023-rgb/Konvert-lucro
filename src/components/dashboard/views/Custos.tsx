@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "../DashboardContext";
 import { useDashboardData } from "../DashboardDataContext";
+import { formatCurrencyDisplay } from "@/lib/client/currency";
 import { DatePickerButton, FilterButton, SearchIcon, TabGroup } from "../shared";
 import { RowMenu } from "../RowMenu";
 import { CustoForm } from "../forms/CustoForm";
@@ -17,7 +18,8 @@ function parseValor(valor: string): number {
 
 export function Custos({ isActive }: { isActive: boolean }) {
   const { goTo } = useDashboard();
-  const { custos, removeCusto } = useDashboardData();
+  const { custos, removeCusto, summary } = useDashboardData();
+  const totalCustos = summary ? formatCurrencyDisplay(summary.totalCostsCents) : "R$ 0,00";
   const [tab, setTab] = useState(TABS[0]);
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -60,10 +62,10 @@ export function Custos({ isActive }: { isActive: boolean }) {
 
       <div className="grid grid-4" style={{ marginBottom: 20 }}>
         <div className="card stat-card">
-          <div className="label">Total de custos</div>
-          <div className="value">R$ 40.000,00</div>
-          <div className="delta down" style={{ color: "var(--red)" }}>
-            ▲ +8% <span className="sub">vs. período anterior</span>
+          <div className="label">Total de custos (mês)</div>
+          <div className="value">{totalCustos}</div>
+          <div className="sub" style={{ fontSize: 12.5 }}>
+            Inclui custos variáveis e recorrentes prorateados
           </div>
         </div>
         <div className="card stat-card">
@@ -123,7 +125,7 @@ export function Custos({ isActive }: { isActive: boolean }) {
                         <td>{c.categoria}</td>
                         <td style={{ fontWeight: 600 }}>{c.valor}</td>
                         <td>
-                          <RowMenu onDelete={() => removeCusto(custos.indexOf(c))} />
+                          <RowMenu onDelete={() => void removeCusto(c.id)} />
                         </td>
                       </tr>
                     ))}

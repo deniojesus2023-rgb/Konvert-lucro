@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 
 interface RowMenuProps {
-  onDelete: () => void;
+  onDelete?: () => void;
   deleteLabel?: string;
+  onEdit?: () => void;
+  editLabel?: string;
 }
 
 /** The prototype's "⋯" row action, now a real (if minimal) dropdown instead of a toast placeholder. */
-export function RowMenu({ onDelete, deleteLabel = "Excluir" }: RowMenuProps) {
+export function RowMenu({ onDelete, deleteLabel = "Excluir", onEdit, editLabel = "Editar" }: RowMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -45,15 +47,28 @@ export function RowMenu({ onDelete, deleteLabel = "Excluir" }: RowMenuProps) {
             minWidth: 120,
           }}
         >
-          <div
-            style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: "var(--red)", cursor: "pointer", borderRadius: "var(--radius-sm)" }}
-            onClick={() => {
-              setOpen(false);
-              onDelete();
-            }}
-          >
-            {deleteLabel}
-          </div>
+          {onEdit && (
+            <div
+              style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, cursor: "pointer", borderRadius: "var(--radius-sm)" }}
+              onClick={() => {
+                setOpen(false);
+                onEdit();
+              }}
+            >
+              {editLabel}
+            </div>
+          )}
+          {onDelete && (
+            <div
+              style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: "var(--red)", cursor: "pointer", borderRadius: "var(--radius-sm)" }}
+              onClick={() => {
+                setOpen(false);
+                onDelete();
+              }}
+            >
+              {deleteLabel}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -40,3 +40,15 @@ export async function listVariableCostsInRange(
     );
   return rows as VariableCostRow[];
 }
+
+/** True if a row for that establishment was actually deleted. */
+export async function deleteVariableCost(
+  db: Executor,
+  input: { id: string; establishmentId: string },
+): Promise<boolean> {
+  const rows = await db
+    .delete(variableCosts)
+    .where(and(eq(variableCosts.id, input.id), eq(variableCosts.establishmentId, input.establishmentId)))
+    .returning({ id: variableCosts.id });
+  return rows.length > 0;
+}

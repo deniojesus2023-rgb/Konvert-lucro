@@ -71,3 +71,16 @@ export const recurringCostSchema = z
   });
 
 export type RecurringCostPayload = z.infer<typeof recurringCostSchema>;
+
+export const MAX_VARIABLE_COST_NOTE_LENGTH = 240;
+
+export const variableCostSchema = z
+  .object({
+    costDate: isoDateSchema,
+    categoryName: z.string().trim().min(1).max(MAX_CHANNEL_NAME_LENGTH),
+    amountCents: centsSchema,
+    note: z.string().trim().max(MAX_VARIABLE_COST_NOTE_LENGTH).nullable().optional(),
+  })
+  .strict();
+
+export type VariableCostPayload = z.infer<typeof variableCostSchema>;

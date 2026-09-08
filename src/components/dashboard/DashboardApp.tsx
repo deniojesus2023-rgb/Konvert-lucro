@@ -24,7 +24,13 @@ import { Perfil } from "./views/Perfil";
  * tab selection) survives moving to another section and back — exactly
  * like the original, which never removed a section from the document.
  */
-export function DashboardApp() {
+export interface DashboardAppProps {
+  establishmentId: string;
+  establishmentName: string;
+  timezone: string;
+}
+
+export function DashboardApp({ establishmentId, establishmentName, timezone }: DashboardAppProps) {
   const [activeView, setActiveView] = useState<ViewName>("overview");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -48,7 +54,7 @@ export function DashboardApp() {
 
   return (
     <DashboardContext.Provider value={{ goTo, toast }}>
-      <DashboardDataProvider>
+      <DashboardDataProvider establishmentId={establishmentId} establishmentName={establishmentName} timezone={timezone}>
         <div className="konvert-dashboard">
           <div className="app">
             <Sidebar activeView={activeView} />

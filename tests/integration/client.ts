@@ -27,6 +27,12 @@ import {
   GET as getGoalRoute,
   POST as postGoalRoute,
 } from "@/app/api/app/establishments/[establishmentId]/goals/route";
+import {
+  GET as listVariableCostsRoute,
+  POST as postVariableCostRoute,
+} from "@/app/api/app/establishments/[establishmentId]/variable-costs/route";
+import { DELETE as deleteVariableCostRoute } from "@/app/api/app/establishments/[establishmentId]/variable-costs/[costId]/route";
+import { POST as postEstablishmentRoute } from "@/app/api/app/establishments/route";
 import { POST as checkoutRoute } from "@/app/api/app/establishments/[establishmentId]/billing/checkout/route";
 import { POST as portalRoute } from "@/app/api/app/establishments/[establishmentId]/billing/portal/route";
 import { GET as getSubscriptionRoute } from "@/app/api/app/establishments/[establishmentId]/subscription/route";
@@ -272,6 +278,48 @@ export class TestClient {
     return this.capture(await getGoalRoute(request, { params: Promise.resolve({ establishmentId }) }));
   }
 
+  async postVariableCost(
+    establishmentId: string,
+    body: unknown,
+  ): Promise<ApiResponse<{ variableCost?: Record<string, unknown>; error?: unknown }>> {
+    const request = this.buildRequest("POST", `/api/app/establishments/${establishmentId}/variable-costs`, {
+      body,
+    });
+    return this.capture(
+      await postVariableCostRoute(request, { params: Promise.resolve({ establishmentId }) }),
+    );
+  }
+
+  async listVariableCosts(
+    establishmentId: string,
+    range: { from: string; to: string },
+  ): Promise<ApiResponse<{ variableCosts?: Record<string, unknown>[]; error?: unknown }>> {
+    const request = this.buildRequest(
+      "GET",
+      `/api/app/establishments/${establishmentId}/variable-costs?from=${range.from}&to=${range.to}`,
+    );
+    return this.capture(
+      await listVariableCostsRoute(request, { params: Promise.resolve({ establishmentId }) }),
+    );
+  }
+
+  async deleteVariableCost(
+    establishmentId: string,
+    costId: string,
+  ): Promise<ApiResponse<{ ok?: boolean; error?: unknown }>> {
+    const request = this.buildRequest("DELETE", `/api/app/establishments/${establishmentId}/variable-costs/${costId}`);
+    return this.capture(
+      await deleteVariableCostRoute(request, { params: Promise.resolve({ establishmentId, costId }) }),
+    );
+  }
+
+  async postEstablishment(
+    body: unknown,
+  ): Promise<ApiResponse<{ establishment?: Record<string, unknown>; error?: unknown }>> {
+    const request = this.buildRequest("POST", "/api/app/establishments", { body });
+    return this.capture(await postEstablishmentRoute(request));
+  }
+
   async postCheckoutSession(
     establishmentId: string,
   ): Promise<ApiResponse<{ url?: string; error?: { code: string; message: string } }>> {
@@ -404,4 +452,21 @@ export async function createLoggedInEstablishment(
   if (!row?.establishment_id) throw new Error("Diagnóstico de teste sem estabelecimento vinculado");
 
   return { establishmentId: row.establishment_id };
+}
+
+/**
+ * Logs a brand-new user in via magic link, with no establishment yet —
+ * the direct-signup onboarding path, as opposed to
+ * `createLoggedInEstablishment`'s diagnostic-conversion path.
+ */
+export async function loginNewUser(client: TestClient, email: string): Promise<void> {
+  const requested = await client.requestMagicLink(email);
+  if (requested.status !== 200 || !requested.body.devVerifyUrl) {
+    throw new Error("Falha ao pedir link de login de teste");
+  }
+  const token = new URL(requested.body.devVerifyUrl, "http://localhost").searchParams.get("token");
+  if (!token) throw new Error("Link de login de teste sem token");
+
+  const verified = await client.verifyMagicLink(token);
+  if (verified.status !== 200) throw new Error("Falha ao verificar link mágico de teste");
 }

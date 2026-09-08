@@ -4,63 +4,6 @@
  * conversion, not a re-wire to real data yet.
  */
 
-export interface VendaRow {
-  pedido: string;
-  dataHora: string;
-  cliente: string;
-  canal: string;
-  itens: string;
-  valor: string;
-  status: "Entregue" | "Cancelado";
-}
-
-export const vendas: VendaRow[] = [
-  { pedido: "#1000", dataHora: "30/06 19:42", cliente: "João Silva", canal: "iFood", itens: "2 itens", valor: "R$ 45,00", status: "Entregue" },
-  { pedido: "#0999", dataHora: "30/06 18:21", cliente: "Ana Costa", canal: "WhatsApp", itens: "3 itens", valor: "R$ 62,00", status: "Entregue" },
-  { pedido: "#0998", dataHora: "30/06 17:50", cliente: "Pedro Santos", canal: "Balcão", itens: "1 item", valor: "R$ 28,00", status: "Entregue" },
-  { pedido: "#0997", dataHora: "30/06 16:33", cliente: "Juliana Lima", canal: "iFood", itens: "2 itens", valor: "R$ 54,00", status: "Cancelado" },
-  { pedido: "#0996", dataHora: "30/06 15:12", cliente: "Carlos Souza", canal: "Delivery próprio", itens: "4 itens", valor: "R$ 80,00", status: "Entregue" },
-  { pedido: "#0995", dataHora: "30/06 14:05", cliente: "Mariana Alves", canal: "WhatsApp", itens: "2 itens", valor: "R$ 36,00", status: "Entregue" },
-  { pedido: "#0994", dataHora: "30/06 12:48", cliente: "Rafael Lima", canal: "Balcão", itens: "1 item", valor: "R$ 22,00", status: "Entregue" },
-  { pedido: "#0993", dataHora: "30/06 11:20", cliente: "Fernanda Rocha", canal: "iFood", itens: "3 itens", valor: "R$ 66,00", status: "Entregue" },
-];
-
-export const vendasPaginas = ["1", "2", "3", "4", "5", "…", "›"];
-
-export interface CustoRow {
-  data: string;
-  descricao: string;
-  categoria: string;
-  valor: string;
-}
-
-export const custos: CustoRow[] = [
-  { data: "28/06/2026", descricao: "Compra de ingredientes", categoria: "Produção e embalagens", valor: "R$ 2.500,00" },
-  { data: "27/06/2026", descricao: "Taxa iFood", categoria: "Taxas das vendas", valor: "R$ 1.300,00" },
-  { data: "26/06/2026", descricao: "Combustível", categoria: "Entregas", valor: "R$ 300,00" },
-  { data: "25/06/2026", descricao: "Salário entregadores", categoria: "Entregas", valor: "R$ 1.800,00" },
-  { data: "24/06/2026", descricao: "Aluguel", categoria: "Estrutura e impostos", valor: "R$ 2.000,00" },
-  { data: "23/06/2026", descricao: "Conta de energia", categoria: "Estrutura e impostos", valor: "R$ 450,00" },
-  { data: "22/06/2026", descricao: "Materiais de limpeza", categoria: "Produção e embalagens", valor: "R$ 220,00" },
-  { data: "21/06/2026", descricao: "Internet", categoria: "Estrutura e impostos", valor: "R$ 150,00" },
-];
-
-export interface MetaRow {
-  nome: string;
-  tipo: string;
-  valorMeta: string;
-  valorAtual: string;
-  progresso: number;
-}
-
-export const metas: MetaRow[] = [
-  { nome: "Receita mensal", tipo: "Financeira", valorMeta: "R$ 60.000,00", valorAtual: "R$ 48.000,00", progresso: 80 },
-  { nome: "Quantidade de pedidos", tipo: "Operacional", valorMeta: "1.200", valorAtual: "800", progresso: 67 },
-  { nome: "Ticket médio", tipo: "Financeira", valorMeta: "R$ 55,00", valorAtual: "R$ 50,00", progresso: 91 },
-  { nome: "Margem de lucro", tipo: "Financeira", valorMeta: "25%", valorAtual: "20%", progresso: 60 },
-  { nome: "Reduzir cancelamentos", tipo: "Operacional", valorMeta: "5%", valorAtual: "8%", progresso: 40 },
-];
-
 export interface ImportacaoRow {
   dataHora: string;
   origem: string;

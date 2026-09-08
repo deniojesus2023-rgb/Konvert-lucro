@@ -1,17 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useDashboardData } from "../DashboardDataContext";
+import { useDashboardData, parseCurrencyInput } from "../DashboardDataContext";
 import { useDashboard } from "../DashboardContext";
 import { Modal } from "../Modal";
 
 const CATEGORIAS = ["Produção e embalagens", "Taxas das vendas", "Entregas", "Estrutura e impostos", "Outros"];
 
-function todayLabel(): string {
+function todayIso(): string {
   const now = new Date();
-  const dd = String(now.getDate()).padStart(2, "0");
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  return `${dd}/${mm}/${now.getFullYear()}`;
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
 interface CustoFormProps {
@@ -26,6 +24,7 @@ export function CustoForm({ open, onClose }: CustoFormProps) {
   const [descricao, setDescricao] = useState("");
   const [categoria, setCategoria] = useState(CATEGORIAS[0]);
   const [valor, setValor] = useState("");
+  const [saving, setSaving] = useState(false);
 
   function reset() {
     setDescricao("");
@@ -33,26 +32,34 @@ export function CustoForm({ open, onClose }: CustoFormProps) {
     setValor("");
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!descricao.trim() || !valor.trim()) return;
+    const amountCents = parseCurrencyInput(valor);
+    if (amountCents === null) return;
 
-    addCusto({
-      data: todayLabel(),
-      descricao: descricao.trim(),
-      categoria,
-      valor: valor.trim().startsWith("R$") ? valor.trim() : `R$ ${valor.trim()}`,
-    });
-    toast("Despesa adicionada.");
-    reset();
-    onClose();
+    setSaving(true);
+    try {
+      await addCusto({
+        costDate: todayIso(),
+        categoryName: categoria,
+        amountCents,
+        note: descricao.trim() || null,
+      });
+      toast("Despesa adicionada.");
+      reset();
+      onClose();
+    } catch {
+      toast("Não foi possível salvar a despesa agora.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <Modal open={open} title="Adicionar despesa" onClose={onClose}>
       <form onSubmit={handleSubmit}>
-        <label className="field-label">Descrição</label>
-        <input className="field-input" value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex.: Compra de ingredientes" required />
+        <label className="field-label">Descrição (opcional)</label>
+        <input className="field-input" value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex.: Compra de ingredientes" />
 
         <label className="field-label" style={{ marginTop: 12 }}>
           Categoria
@@ -70,8 +77,8 @@ export function CustoForm({ open, onClose }: CustoFormProps) {
         </label>
         <input className="field-input" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ex.: 250,00" required />
 
-        <button type="submit" className="btn btn-primary" style={{ width: "100%", justifyContent: "center", marginTop: 16 }}>
-          Adicionar despesa
+        <button type="submit" className="btn btn-primary" style={{ width: "100%", justifyContent: "center", marginTop: 16 }} disabled={saving}>
+          {saving ? "Salvando…" : "Adicionar despesa"}
         </button>
       </form>
     </Modal>
