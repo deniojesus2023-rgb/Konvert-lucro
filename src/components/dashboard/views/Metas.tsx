@@ -1,14 +1,18 @@
 "use client";
 
-import { useDashboard } from "../DashboardContext";
+import { useState } from "react";
 import { DatePickerButton } from "../shared";
-import { metas } from "../data";
+import { useDashboardData } from "../DashboardDataContext";
+import { RowMenu } from "../RowMenu";
+import { MetaForm } from "../forms/MetaForm";
 
 export function Metas({ isActive }: { isActive: boolean }) {
-  const { toast } = useDashboard();
+  const { metas, removeMeta } = useDashboardData();
+  const [formOpen, setFormOpen] = useState(false);
 
   return (
     <section className={`view${isActive ? " active" : ""}`} id="view-metas">
+      <MetaForm open={formOpen} onClose={() => setFormOpen(false)} />
       <div className="page-head">
         <div>
           <h1>Metas</h1>
@@ -16,7 +20,7 @@ export function Metas({ isActive }: { isActive: boolean }) {
         </div>
         <div className="head-actions">
           <DatePickerButton />
-          <button className="btn btn-primary" onClick={() => toast("Nova meta — disponível na versão completa")}>
+          <button className="btn btn-primary" onClick={() => setFormOpen(true)}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M12 5v14M5 12h14" />
             </svg>
@@ -110,11 +114,18 @@ export function Metas({ isActive }: { isActive: boolean }) {
                   <td>
                     <span className="badge badge-blue">Em andamento</span>
                   </td>
-                  <td className="row-link" onClick={() => toast("Editar meta (demonstração)")}>
-                    ⋯
+                  <td>
+                    <RowMenu onDelete={() => removeMeta(m.nome)} />
                   </td>
                 </tr>
               ))}
+              {metas.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", color: "var(--text-muted)" }}>
+                    Nenhuma meta cadastrada.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

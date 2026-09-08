@@ -28,6 +28,10 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 
 export function Ajuda({ isActive }: { isActive: boolean }) {
   const { goTo, toast } = useDashboard();
+  const [search, setSearch] = useState("");
+
+  const term = search.trim().toLowerCase();
+  const filteredFaqs = term ? faqs.filter(([q, a]) => q.toLowerCase().includes(term) || a.toLowerCase().includes(term)) : faqs;
 
   return (
     <section className={`view${isActive ? " active" : ""}`} id="view-ajuda">
@@ -40,8 +44,8 @@ export function Ajuda({ isActive }: { isActive: boolean }) {
 
       <div className="search-box" style={{ maxWidth: 640, margin: "0 auto 26px", padding: "12px 16px" }}>
         <SearchIcon />
-        <input type="text" placeholder="O que você precisa?" />
-        <button className="btn btn-primary" style={{ padding: "6px 14px" }} onClick={() => toast("Buscando… (demonstração)")}>
+        <input type="text" placeholder="O que você precisa?" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <button className="btn btn-primary" style={{ padding: "6px 14px" }}>
           Buscar
         </button>
       </div>
@@ -106,9 +110,10 @@ export function Ajuda({ isActive }: { isActive: boolean }) {
         <div className="card section-block">
           <div className="section-title">Perguntas frequentes</div>
           <div style={{ marginTop: 12 }}>
-            {faqs.map(([q, a]) => (
+            {filteredFaqs.map(([q, a]) => (
               <FaqItem key={q} question={q} answer={a} />
             ))}
+            {filteredFaqs.length === 0 && <p style={{ color: "var(--text-muted)", fontSize: 13.5 }}>Nenhuma pergunta encontrada para &quot;{search}&quot;.</p>}
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

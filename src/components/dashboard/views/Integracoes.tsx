@@ -1,10 +1,16 @@
 "use client";
 
 import { useDashboard } from "../DashboardContext";
-import { integList } from "../data";
+import { useDashboardData } from "../DashboardDataContext";
 
 export function Integracoes({ isActive }: { isActive: boolean }) {
   const { toast } = useDashboard();
+  const { integList, toggleIntegracao } = useDashboardData();
+
+  function handleToggle(name: string, currentlyOn: boolean) {
+    toggleIntegracao(name);
+    toast(currentlyOn ? `${name} desconectado.` : `${name} conectado.`);
+  }
 
   return (
     <section className={`view${isActive ? " active" : ""}`} id="view-integracoes">
@@ -51,10 +57,10 @@ export function Integracoes({ isActive }: { isActive: boolean }) {
               <span className={`dot ${it.on ? "on" : ""}`}></span>
               {it.on ? "Conectado" : "Conectar"}
             </div>
-            {it.sync && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Última sincronização: {it.sync}</div>}
+            {it.on && it.sync && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Última sincronização: {it.sync}</div>}
             <button
               className={`btn ${it.on ? "" : "btn-primary"}`}
-              onClick={() => toast(`${it.on ? "Configurações da integração" : "Conectando"} (demonstração)`)}
+              onClick={() => (it.on ? toast("Configurações da integração (demonstração)") : handleToggle(it.name, it.on))}
             >
               {it.on ? "Configurar" : "Conectar"}
             </button>
@@ -97,7 +103,10 @@ export function Integracoes({ isActive }: { isActive: boolean }) {
                   <td>
                     <span className={`badge ${it.on ? "badge-green" : "badge-gray"}`}>{it.on ? "Conectado" : "Não conectado"}</span>
                   </td>
-                  <td className="row-link" onClick={() => toast(`${it.on ? "Configurar" : "Conectar"} ${it.name} (demonstração)`)}>
+                  <td
+                    className="row-link"
+                    onClick={() => (it.on ? toast("Configurações da integração (demonstração)") : handleToggle(it.name, it.on))}
+                  >
                     {it.on ? "Configurar" : "Conectar"}
                   </td>
                 </tr>

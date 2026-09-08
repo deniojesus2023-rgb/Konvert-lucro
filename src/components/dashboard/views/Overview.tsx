@@ -1,13 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { useDashboard } from "../DashboardContext";
 import { DatePickerButton } from "../shared";
+import { VendaForm } from "../forms/VendaForm";
 
 export function Overview({ isActive }: { isActive: boolean }) {
-  const { goTo, toast } = useDashboard();
+  const { goTo } = useDashboard();
+  const [formOpen, setFormOpen] = useState(false);
 
   return (
     <section className={`view${isActive ? " active" : ""}`} id="view-overview">
+      <VendaForm open={formOpen} onClose={() => setFormOpen(false)} />
       <div className="page-head">
         <div>
           <h1>Visão geral</h1>
@@ -23,7 +27,7 @@ export function Overview({ isActive }: { isActive: boolean }) {
             </svg>
             Importar vendas
           </button>
-          <button className="btn btn-primary" onClick={() => toast("Registrar venda — disponível na versão completa")}>
+          <button className="btn btn-primary" onClick={() => setFormOpen(true)}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M12 5v14M5 12h14" />
             </svg>

@@ -1,14 +1,47 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useDashboard } from "../DashboardContext";
+import { useDashboardData } from "../DashboardDataContext";
 import { DatePickerButton, FilterButton, SearchIcon, TabGroup } from "../shared";
-import { custos } from "../data";
+import { RowMenu } from "../RowMenu";
+import { CustoForm } from "../forms/CustoForm";
+
+const TABS = ["Despesas", "Categorias"];
+
+/** Parses "R$ 2.500,00" into a plain number for the Categorias rollup. */
+function parseValor(valor: string): number {
+  const digits = valor.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".");
+  return Number(digits) || 0;
+}
 
 export function Custos({ isActive }: { isActive: boolean }) {
-  const { goTo, toast } = useDashboard();
+  const { goTo } = useDashboard();
+  const { custos, removeCusto } = useDashboardData();
+  const [tab, setTab] = useState(TABS[0]);
+  const [search, setSearch] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return custos;
+    return custos.filter((c) => c.descricao.toLowerCase().includes(term) || c.categoria.toLowerCase().includes(term));
+  }, [custos, search]);
+
+  const porCategoria = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const c of custos) {
+      totals.set(c.categoria, (totals.get(c.categoria) ?? 0) + parseValor(c.valor));
+    }
+    const grandTotal = [...totals.values()].reduce((a, b) => a + b, 0) || 1;
+    return [...totals.entries()]
+      .map(([categoria, total]) => ({ categoria, total, pct: Math.round((total / grandTotal) * 100) }))
+      .sort((a, b) => b.total - a.total);
+  }, [custos]);
 
   return (
     <section className={`view${isActive ? " active" : ""}`} id="view-custos">
+      <CustoForm open={formOpen} onClose={() => setFormOpen(false)} />
       <div className="page-head">
         <div>
           <h1>Custos e despesas</h1>
@@ -16,7 +49,7 @@ export function Custos({ isActive }: { isActive: boolean }) {
         </div>
         <div className="head-actions">
           <DatePickerButton />
-          <button className="btn btn-primary" onClick={() => toast("Adicionar despesa — disponível na versão completa")}>
+          <button className="btn btn-primary" onClick={() => setFormOpen(true)}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M12 5v14M5 12h14" />
             </svg>
@@ -50,9 +83,7 @@ export function Custos({ isActive }: { isActive: boolean }) {
           </div>
         </div>
         <div className="card stat-card">
-          <div className="label">
-            % dos custos nas vendas
-          </div>
+          <div className="label">% dos custos nas vendas</div>
           <div className="value">
             80% <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>ⓘ</span>
           </div>
@@ -64,38 +95,65 @@ export function Custos({ isActive }: { isActive: boolean }) {
 
       <div className="grid grid-2">
         <div className="card section-block">
-          <TabGroup id="custos-tabs" tabs={["Despesas", "Categorias"]} />
-          <div className="search-row">
-            <div className="search-box">
-              <SearchIcon />
-              <input type="text" placeholder="Buscar despesa..." id="custos-search" />
+          <TabGroup id="custos-tabs" tabs={TABS} active={tab} onChange={setTab} />
+
+          {tab === "Despesas" ? (
+            <>
+              <div className="search-row">
+                <div className="search-box">
+                  <SearchIcon />
+                  <input type="text" placeholder="Buscar despesa..." id="custos-search" value={search} onChange={(e) => setSearch(e.target.value)} />
+                </div>
+                <FilterButton />
+              </div>
+              <div className="table-wrap">
+                <table id="custos-table">
+                  <tbody>
+                    <tr>
+                      <th>Data</th>
+                      <th>Descrição</th>
+                      <th>Categoria</th>
+                      <th>Valor</th>
+                      <th></th>
+                    </tr>
+                    {filtered.map((c, i) => (
+                      <tr key={`${c.descricao}-${c.data}-${i}`}>
+                        <td>{c.data}</td>
+                        <td>{c.descricao}</td>
+                        <td>{c.categoria}</td>
+                        <td style={{ fontWeight: 600 }}>{c.valor}</td>
+                        <td>
+                          <RowMenu onDelete={() => removeCusto(custos.indexOf(c))} />
+                        </td>
+                      </tr>
+                    ))}
+                    {filtered.length === 0 && (
+                      <tr>
+                        <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)" }}>
+                          Nenhuma despesa encontrada.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <div style={{ marginTop: 6 }}>
+              {porCategoria.map((row) => (
+                <div className="mini-bar-row" key={row.categoria}>
+                  <div className="cat">{row.categoria}</div>
+                  <div className="val">
+                    R$ {row.total.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="mini-bar-track">
+                    <div className="mini-bar-fill" style={{ width: `${row.pct}%` }}></div>
+                  </div>
+                  <div className="mini-bar-pct">{row.pct}%</div>
+                </div>
+              ))}
             </div>
-            <FilterButton />
-          </div>
-          <div className="table-wrap">
-            <table id="custos-table">
-              <tbody>
-                <tr>
-                  <th>Data</th>
-                  <th>Descrição</th>
-                  <th>Categoria</th>
-                  <th>Valor</th>
-                  <th></th>
-                </tr>
-                {custos.map((c, i) => (
-                  <tr key={i}>
-                    <td>{c.data}</td>
-                    <td>{c.descricao}</td>
-                    <td>{c.categoria}</td>
-                    <td style={{ fontWeight: 600 }}>{c.valor}</td>
-                    <td className="row-link" onClick={() => toast("Editar despesa (demonstração)")}>
-                      ⋯
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          )}
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

@@ -1,14 +1,53 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useDashboard } from "../DashboardContext";
+import { useDashboardData } from "../DashboardDataContext";
 import { DatePickerButton, FilterButton, SearchIcon, TabGroup } from "../shared";
-import { vendas, vendasPaginas } from "../data";
+import { RowMenu } from "../RowMenu";
+import { VendaForm } from "../forms/VendaForm";
+import { downloadCsv } from "../csv";
+import { vendasPaginas } from "../data";
+
+const TABS = ["Todos", "Delivery", "Balcão", "Retirada"];
+
+function matchesTab(canal: string, tab: string): boolean {
+  if (tab === "Todos") return true;
+  if (tab === "Balcão") return canal === "Balcão";
+  if (tab === "Delivery") return canal === "iFood" || canal === "WhatsApp" || canal === "Delivery próprio";
+  // "Retirada" has no matching demo channel yet — a real filter that
+  // honestly shows "nothing" instead of faking a match.
+  return false;
+}
 
 export function Vendas({ isActive }: { isActive: boolean }) {
   const { goTo, toast } = useDashboard();
+  const { vendas, removeVenda } = useDashboardData();
+  const [tab, setTab] = useState(TABS[0]);
+  const [search, setSearch] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return vendas.filter((v) => {
+      if (!matchesTab(v.canal, tab)) return false;
+      if (!term) return true;
+      return v.cliente.toLowerCase().includes(term) || v.pedido.toLowerCase().includes(term) || v.valor.toLowerCase().includes(term);
+    });
+  }, [vendas, tab, search]);
+
+  function handleExport() {
+    downloadCsv(
+      "vendas.csv",
+      ["Pedido", "Data e hora", "Cliente", "Canal", "Itens", "Valor", "Status"],
+      filtered.map((v) => [v.pedido, v.dataHora, v.cliente, v.canal, v.itens, v.valor, v.status]),
+    );
+    toast("Vendas exportadas.");
+  }
 
   return (
     <section className={`view${isActive ? " active" : ""}`} id="view-vendas">
+      <VendaForm open={formOpen} onClose={() => setFormOpen(false)} />
       <div className="page-head">
         <div>
           <h1>Vendas</h1>
@@ -16,7 +55,7 @@ export function Vendas({ isActive }: { isActive: boolean }) {
         </div>
         <div className="head-actions">
           <DatePickerButton />
-          <button className="btn" onClick={() => toast("Exportando vendas… (demonstração)")}>
+          <button className="btn" onClick={handleExport}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M12 15V3" />
               <path d="M7 8l5-5 5 5" />
@@ -24,7 +63,7 @@ export function Vendas({ isActive }: { isActive: boolean }) {
             </svg>
             Exportar
           </button>
-          <button className="btn btn-primary" onClick={() => toast("Registrar venda — disponível na versão completa")}>
+          <button className="btn btn-primary" onClick={() => setFormOpen(true)}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M12 5v14M5 12h14" />
             </svg>
@@ -65,11 +104,17 @@ export function Vendas({ isActive }: { isActive: boolean }) {
       </div>
 
       <div className="card section-block">
-        <TabGroup id="vendas-tabs" tabs={["Todos", "Delivery", "Balcão", "Retirada"]} />
+        <TabGroup id="vendas-tabs" tabs={TABS} active={tab} onChange={setTab} />
         <div className="search-row">
           <div className="search-box">
             <SearchIcon />
-            <input type="text" placeholder="Buscar por cliente, pedido ou valor..." id="vendas-search" />
+            <input
+              type="text"
+              placeholder="Buscar por cliente, pedido ou valor..."
+              id="vendas-search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
           <FilterButton />
         </div>
@@ -86,7 +131,7 @@ export function Vendas({ isActive }: { isActive: boolean }) {
                 <th>Status</th>
                 <th></th>
               </tr>
-              {vendas.map((v) => (
+              {filtered.map((v) => (
                 <tr key={v.pedido}>
                   <td style={{ fontWeight: 600 }}>{v.pedido}</td>
                   <td>{v.dataHora}</td>
@@ -97,11 +142,18 @@ export function Vendas({ isActive }: { isActive: boolean }) {
                   <td>
                     <span className={`badge ${v.status === "Entregue" ? "badge-green" : "badge-red"}`}>{v.status}</span>
                   </td>
-                  <td className="row-link" onClick={() => toast("Detalhes do pedido (demonstração)")}>
-                    ⋯
+                  <td>
+                    <RowMenu onDelete={() => removeVenda(v.pedido)} />
                   </td>
                 </tr>
               ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: "center", color: "var(--text-muted)" }}>
+                    Nenhuma venda encontrada.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -113,7 +165,7 @@ export function Vendas({ isActive }: { isActive: boolean }) {
               </div>
             ))}
           </div>
-          <div className="pg-count">Mostrando 8 de 1.000 pedidos</div>
+          <div className="pg-count">Mostrando {filtered.length} de 1.000 pedidos</div>
         </div>
       </div>
 

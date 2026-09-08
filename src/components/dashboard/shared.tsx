@@ -20,18 +20,38 @@ export function DatePickerButton() {
   );
 }
 
-/** Generic, cosmetic tab group — clicking a tab only toggles its own active state, same as the prototype's JS. */
-export function TabGroup({ tabs, id }: { tabs: string[]; id?: string }) {
-  const [active, setActive] = useState(tabs[0]);
+interface TabGroupProps {
+  tabs: string[];
+  id?: string;
+  /** Controlled mode: parent owns which tab is active and renders content per tab. */
+  active?: string;
+  onChange?: (tab: string) => void;
+}
+
+/**
+ * The prototype's tab strip. Uncontrolled by default (a tab just toggles
+ * its own active class, same as the original's cosmetic-only JS) — pass
+ * `active`/`onChange` when the page actually shows different content per
+ * tab (Configurações, Perfil, Custos).
+ */
+export function TabGroup({ tabs, id, active, onChange }: TabGroupProps) {
+  const [internalActive, setInternalActive] = useState(tabs[0]);
+  const current = active ?? internalActive;
+
+  function select(tab: string) {
+    if (onChange) onChange(tab);
+    else setInternalActive(tab);
+  }
+
   return (
     <div className="tabs" id={id}>
       {tabs.map((tab) => (
         <button
           key={tab}
           type="button"
-          className={`tab-btn${tab === active ? " active" : ""}`}
+          className={`tab-btn${tab === current ? " active" : ""}`}
           data-tab={tab}
-          onClick={() => setActive(tab)}
+          onClick={() => select(tab)}
         >
           {tab}
         </button>
@@ -59,4 +79,10 @@ export function FilterButton() {
       Filtrar
     </button>
   );
+}
+
+/** The prototype's on/off pill, now with a real (local) on/off state instead of a purely cosmetic class toggle. */
+export function ToggleSwitch({ defaultOn = true }: { defaultOn?: boolean }) {
+  const [on, setOn] = useState(defaultOn);
+  return <div className={`toggle${on ? " on" : ""}`} onClick={() => setOn((v) => !v)}></div>;
 }

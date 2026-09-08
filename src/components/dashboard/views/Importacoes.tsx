@@ -1,11 +1,49 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { useDashboard } from "../DashboardContext";
+import { useDashboardData } from "../DashboardDataContext";
 import { DatePickerButton } from "../shared";
-import { importacoes } from "../data";
+import { RowMenu } from "../RowMenu";
+import { importacoes as initialImportacoes } from "../data";
 
 export function Importacoes({ isActive }: { isActive: boolean }) {
   const { goTo, toast } = useDashboard();
+  const { integList, toggleIntegracao } = useDashboardData();
+  const [importacoes, setImportacoes] = useState(initialImportacoes);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const iFood = integList.find((it) => it.name === "iFood")!;
+  const anotaAi = integList.find((it) => it.name === "Anota Aí")!;
+  const whatsapp = integList.find((it) => it.name === "WhatsApp")!;
+
+  function handleConnect(name: string, on: boolean) {
+    toggleIntegracao(name);
+    toast(on ? `${name} desconectado.` : `${name} conectado.`);
+  }
+
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const hh = String(now.getHours()).padStart(2, "0");
+    const min = String(now.getMinutes()).padStart(2, "0");
+    setImportacoes((prev) => [
+      {
+        dataHora: `${dd}/${mm}/${now.getFullYear()} ${hh}:${min}`,
+        origem: "Arquivo CSV",
+        periodo: file.name,
+        registros: "—",
+        status: "Concluída",
+        usuario: "Mariana Costa",
+      },
+      ...prev,
+    ]);
+    toast(`Arquivo "${file.name}" importado.`);
+    e.target.value = "";
+  }
 
   return (
     <section className={`view${isActive ? " active" : ""}`} id="view-importacoes">
@@ -30,11 +68,12 @@ export function Importacoes({ isActive }: { isActive: boolean }) {
               <div className="integration-desc">Importe automaticamente seus pedidos do iFood.</div>
             </div>
           </div>
-          <div className="status-chip off">
-            <span className="dot"></span>Não conectado
+          <div className={`status-chip ${iFood.on ? "on" : "off"}`}>
+            <span className={`dot ${iFood.on ? "on" : ""}`}></span>
+            {iFood.on ? "Conectado" : "Não conectado"}
           </div>
-          <button className="btn btn-outline" onClick={() => toast("Conectando iFood… (demonstração)")}>
-            Conectar
+          <button className="btn btn-outline" onClick={() => handleConnect("iFood", iFood.on)}>
+            {iFood.on ? "Desconectar" : "Conectar"}
           </button>
         </div>
         <div className="card integration-card">
@@ -47,11 +86,12 @@ export function Importacoes({ isActive }: { isActive: boolean }) {
               <div className="integration-desc">Importe seus pedidos do Anota Aí.</div>
             </div>
           </div>
-          <div className="status-chip off">
-            <span className="dot"></span>Não conectado
+          <div className={`status-chip ${anotaAi.on ? "on" : "off"}`}>
+            <span className={`dot ${anotaAi.on ? "on" : ""}`}></span>
+            {anotaAi.on ? "Conectado" : "Não conectado"}
           </div>
-          <button className="btn btn-outline" onClick={() => toast("Conectando Anota Aí… (demonstração)")}>
-            Conectar
+          <button className="btn btn-outline" onClick={() => handleConnect("Anota Aí", anotaAi.on)}>
+            {anotaAi.on ? "Desconectar" : "Conectar"}
           </button>
         </div>
         <div className="card integration-card">
@@ -64,11 +104,12 @@ export function Importacoes({ isActive }: { isActive: boolean }) {
               <div className="integration-desc">Importe vendas realizadas pelo WhatsApp.</div>
             </div>
           </div>
-          <div className="status-chip off">
-            <span className="dot"></span>Não conectado
+          <div className={`status-chip ${whatsapp.on ? "on" : "off"}`}>
+            <span className={`dot ${whatsapp.on ? "on" : ""}`}></span>
+            {whatsapp.on ? "Conectado" : "Não conectado"}
           </div>
-          <button className="btn btn-outline" onClick={() => toast("Conectando WhatsApp… (demonstração)")}>
-            Conectar
+          <button className="btn btn-outline" onClick={() => handleConnect("WhatsApp", whatsapp.on)}>
+            {whatsapp.on ? "Desconectar" : "Conectar"}
           </button>
         </div>
         <div className="card integration-card">
@@ -84,7 +125,8 @@ export function Importacoes({ isActive }: { isActive: boolean }) {
               <div className="integration-desc">Importe suas vendas por planilha (CSV ou Excel).</div>
             </div>
           </div>
-          <button className="btn btn-primary" onClick={() => toast("Selecione um arquivo… (demonstração)")}>
+          <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: "none" }} onChange={handleFileSelected} />
+          <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()}>
             Importar arquivo
           </button>
         </div>
@@ -114,8 +156,8 @@ export function Importacoes({ isActive }: { isActive: boolean }) {
                     <span className={`badge ${imp.status === "Concluída" ? "badge-green" : "badge-red"}`}>{imp.status}</span>
                   </td>
                   <td>{imp.usuario}</td>
-                  <td className="row-link" onClick={() => toast("Detalhes da importação (demonstração)")}>
-                    ⋯
+                  <td>
+                    <RowMenu onDelete={() => setImportacoes((prev) => prev.filter((_, idx) => idx !== i))} />
                   </td>
                 </tr>
               ))}

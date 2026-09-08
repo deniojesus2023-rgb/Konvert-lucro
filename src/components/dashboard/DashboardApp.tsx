@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./dashboard.css";
 import { DashboardContext, type ViewName } from "./DashboardContext";
+import { DashboardDataProvider } from "./DashboardDataContext";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { Overview } from "./views/Overview";
@@ -47,27 +48,29 @@ export function DashboardApp() {
 
   return (
     <DashboardContext.Provider value={{ goTo, toast }}>
-      <div className="konvert-dashboard">
-        <div className="app">
-          <Sidebar activeView={activeView} />
-          <div className="main">
-            <TopBar activeView={activeView} />
-            <div className="content">
-              <Overview isActive={activeView === "overview"} />
-              <Vendas isActive={activeView === "vendas"} />
-              <Custos isActive={activeView === "custos"} />
-              <Resultados isActive={activeView === "resultados"} />
-              <Metas isActive={activeView === "metas"} />
-              <Importacoes isActive={activeView === "importacoes"} />
-              <Integracoes isActive={activeView === "integracoes"} />
-              <Configuracoes isActive={activeView === "configuracoes"} />
-              <Ajuda isActive={activeView === "ajuda"} />
-              <Perfil isActive={activeView === "perfil"} />
+      <DashboardDataProvider>
+        <div className="konvert-dashboard">
+          <div className="app">
+            <Sidebar activeView={activeView} />
+            <div className="main">
+              <TopBar activeView={activeView} />
+              <div className="content">
+                <Overview isActive={activeView === "overview"} />
+                <Vendas isActive={activeView === "vendas"} />
+                <Custos isActive={activeView === "custos"} />
+                <Resultados isActive={activeView === "resultados"} />
+                <Metas isActive={activeView === "metas"} />
+                <Importacoes isActive={activeView === "importacoes"} />
+                <Integracoes isActive={activeView === "integracoes"} />
+                <Configuracoes isActive={activeView === "configuracoes"} />
+                <Ajuda isActive={activeView === "ajuda"} />
+                <Perfil isActive={activeView === "perfil"} />
+              </div>
             </div>
           </div>
+          <div className={`toast${toastMessage ? " show" : ""}`}>{toastMessage}</div>
         </div>
-        <div className={`toast${toastMessage ? " show" : ""}`}>{toastMessage}</div>
-      </div>
+      </DashboardDataProvider>
     </DashboardContext.Provider>
   );
 }
