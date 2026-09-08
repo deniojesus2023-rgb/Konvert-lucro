@@ -106,6 +106,55 @@ describe("recurring costs", () => {
     expect(summaryB.status).toBe(200);
     expect(summaryB.body.summary?.totalCostsCents).toBe(0);
   });
+
+  it("deactivating a recurring cost removes its share from a later summary", async () => {
+    const client = new TestClient();
+    const { establishmentId } = await createLoggedInEstablishment(client);
+
+    const created = await client.postRecurringCost(establishmentId, {
+      categoryName: "Aluguel",
+      name: "Aluguel da cozinha",
+      amountCents: 3_100_00,
+      frequency: "monthly",
+      startDate: "2026-01-01",
+    });
+    const costId = created.body.recurringCost?.id as string;
+
+    const deactivated = await client.deactivateRecurringCost(establishmentId, costId);
+    expect(deactivated.status).toBe(200);
+
+    const summary = await client.getSummary(establishmentId, { from: "2026-01-01", to: "2026-01-31" });
+    expect(summary.body.summary?.totalCostsCents).toBe(0);
+
+    const list = await client.listRecurringCosts(establishmentId);
+    expect(list.body.recurringCosts?.[0]?.active).toBe(false);
+  });
+
+  it("404s deactivating a recurring cost that belongs to a different establishment", async () => {
+    const clientA = new TestClient();
+    const { establishmentId: establishmentA } = await createLoggedInEstablishment(clientA, {
+      email: "dona-rec-d@example.com",
+    });
+    const created = await clientA.postRecurringCost(establishmentA, {
+      categoryName: "Aluguel",
+      name: "Aluguel A",
+      amountCents: 1_000_00,
+      frequency: "monthly",
+      startDate: "2026-01-01",
+    });
+    const costId = created.body.recurringCost?.id as string;
+
+    const clientB = new TestClient();
+    const { establishmentId: establishmentB } = await createLoggedInEstablishment(clientB, {
+      email: "dono-rec-e@example.com",
+    });
+
+    const deactivated = await clientB.deactivateRecurringCost(establishmentB, costId);
+    expect(deactivated.status).toBe(200);
+
+    const listA = await clientA.listRecurringCosts(establishmentA);
+    expect(listA.body.recurringCosts?.[0]?.active).toBe(true);
+  });
 });
 
 describe("monthly goals", () => {

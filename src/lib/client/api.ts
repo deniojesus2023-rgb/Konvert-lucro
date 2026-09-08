@@ -353,6 +353,10 @@ export function deleteVariableCost(establishmentId: string, costId: string): Pro
   return request(`/api/app/establishments/${establishmentId}/variable-costs/${costId}`, { method: "DELETE" });
 }
 
+export function deactivateRecurringCost(establishmentId: string, costId: string): Promise<{ ok: true }> {
+  return request(`/api/app/establishments/${establishmentId}/recurring-costs/${costId}`, { method: "DELETE" });
+}
+
 export interface SendEventBody {
   eventName: FunnelEventName;
   diagnosticId?: string;

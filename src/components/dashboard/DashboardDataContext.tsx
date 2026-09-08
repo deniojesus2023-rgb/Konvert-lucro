@@ -6,16 +6,20 @@ import {
   getGoalProgress,
   listDailyEntries,
   listVariableCosts,
+  listRecurringCosts,
   upsertDailyEntry,
   upsertGoal,
   createVariableCost,
+  createRecurringCost,
+  deactivateRecurringCost as apiDeactivateRecurringCost,
   deleteVariableCost as apiDeleteVariableCost,
   type DailyEntryView,
   type VariableCostView,
+  type RecurringCostView,
   type PeriodSummary,
 } from "@/lib/client/api";
 import { formatCurrencyDisplay, parseCurrencyInput } from "@/lib/client/currency";
-import { startOfMonth, todayInTimezone } from "@/lib/dates/period-bounds";
+import { startOfMonth, todayInTimezone, previousMonthRange } from "@/lib/dates/period-bounds";
 import { integList as initialIntegList, type IntegracaoItem } from "./data";
 
 function formatDateBR(iso: string): string {
@@ -75,10 +79,31 @@ export interface MetaRow {
   progresso: number;
 }
 
+export interface RecurringCostRow {
+  id: string;
+  nome: string;
+  valor: string;
+  frequencia: "monthly" | "weekly";
+  inicio: string;
+  ativo: boolean;
+}
+
+function toRecurringCostRow(cost: RecurringCostView & { active?: boolean }): RecurringCostRow {
+  return {
+    id: cost.id,
+    nome: cost.name,
+    valor: formatCurrencyDisplay(cost.amountCents),
+    frequencia: cost.frequency,
+    inicio: formatDateBR(cost.startDate),
+    ativo: cost.active ?? true,
+  };
+}
+
 export interface DashboardDataContextValue {
   loading: boolean;
   error: string | null;
   summary: PeriodSummary | null;
+  previousSummary: PeriodSummary | null;
 
   vendas: VendaRow[];
   addVenda: (input: {
@@ -95,6 +120,16 @@ export interface DashboardDataContextValue {
   custos: CustoRow[];
   addCusto: (input: { costDate: string; categoryName: string; amountCents: number; note?: string | null }) => Promise<void>;
   removeCusto: (id: string) => Promise<void>;
+
+  recurringCosts: RecurringCostRow[];
+  addRecurringCost: (input: {
+    categoryName: string;
+    name: string;
+    amountCents: number;
+    frequency: "monthly" | "weekly";
+    startDate: string;
+  }) => Promise<void>;
+  removeRecurringCost: (id: string) => Promise<void>;
 
   metas: MetaRow[];
   profitGoalCents: number | null;
@@ -125,8 +160,10 @@ export function DashboardDataProvider({ establishmentId, timezone, children }: D
   const [error, setError] = useState<string | null>(null);
   const [vendas, setVendas] = useState<VendaRow[]>([]);
   const [custos, setCustos] = useState<CustoRow[]>([]);
+  const [recurringCosts, setRecurringCosts] = useState<RecurringCostRow[]>([]);
   const [profitGoalCents, setProfitGoalCents] = useState<number | null>(null);
   const [summary, setSummary] = useState<PeriodSummary | null>(null);
+  const [previousSummary, setPreviousSummary] = useState<PeriodSummary | null>(null);
   const [integList, setIntegList] = useState<IntegracaoItem[]>(initialIntegList);
 
   const today = todayInTimezone(timezone);
@@ -136,16 +173,21 @@ export function DashboardDataProvider({ establishmentId, timezone, children }: D
     setLoading(true);
     setError(null);
     try {
-      const [entriesRes, costsRes, goalRes, summaryRes] = await Promise.all([
+      const previousMonth = previousMonthRange(monthStart);
+      const [entriesRes, costsRes, recurringRes, goalRes, summaryRes, previousSummaryRes] = await Promise.all([
         listDailyEntries(establishmentId, { from: monthStart, to: today }),
         listVariableCosts(establishmentId, { from: monthStart, to: today }),
+        listRecurringCosts(establishmentId),
         getGoalProgress(establishmentId, monthStart),
         getPeriodSummary(establishmentId, { from: monthStart, to: today }),
+        getPeriodSummary(establishmentId, { from: previousMonth.fromDate, to: previousMonth.toDate }),
       ]);
       setVendas(entriesRes.entries.map(toVendaRow).sort((a, b) => (a.entryDate < b.entryDate ? 1 : -1)));
       setCustos(costsRes.variableCosts.map(toCustoRow).sort((a, b) => (a.data < b.data ? 1 : -1)));
+      setRecurringCosts(recurringRes.recurringCosts.filter((c) => c.active).map(toRecurringCostRow));
       setProfitGoalCents(goalRes.progress.profitGoalCents);
       setSummary(summaryRes.summary);
+      setPreviousSummary(previousSummaryRes.summary);
     } catch {
       setError("Não foi possível carregar os dados do painel agora. Tente recarregar a página.");
     } finally {
@@ -190,6 +232,22 @@ export function DashboardDataProvider({ establishmentId, timezone, children }: D
     [establishmentId, reload],
   );
 
+  const addRecurringCost = useCallback(
+    async (input: { categoryName: string; name: string; amountCents: number; frequency: "monthly" | "weekly"; startDate: string }) => {
+      await createRecurringCost(establishmentId, input);
+      await reload();
+    },
+    [establishmentId, reload],
+  );
+
+  const removeRecurringCost = useCallback(
+    async (id: string) => {
+      await apiDeactivateRecurringCost(establishmentId, id);
+      await reload();
+    },
+    [establishmentId, reload],
+  );
+
   const setProfitGoal = useCallback(
     async (amountCents: number | null) => {
       await upsertGoal(establishmentId, { periodStart: monthStart, profitGoalCents: amountCents });
@@ -222,18 +280,40 @@ export function DashboardDataProvider({ establishmentId, timezone, children }: D
       loading,
       error,
       summary,
+      previousSummary,
       vendas,
       addVenda,
       custos,
       addCusto,
       removeCusto,
+      recurringCosts,
+      addRecurringCost,
+      removeRecurringCost,
       metas,
       profitGoalCents,
       setProfitGoal,
       integList,
       toggleIntegracao,
     }),
-    [loading, error, summary, vendas, addVenda, custos, addCusto, removeCusto, metas, profitGoalCents, setProfitGoal, integList, toggleIntegracao],
+    [
+      loading,
+      error,
+      summary,
+      previousSummary,
+      vendas,
+      addVenda,
+      custos,
+      addCusto,
+      removeCusto,
+      recurringCosts,
+      addRecurringCost,
+      removeRecurringCost,
+      metas,
+      profitGoalCents,
+      setProfitGoal,
+      integList,
+      toggleIntegracao,
+    ],
   );
 
   return <DashboardDataContext.Provider value={value}>{children}</DashboardDataContext.Provider>;

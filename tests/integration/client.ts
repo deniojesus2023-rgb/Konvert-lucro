@@ -23,6 +23,7 @@ import {
   GET as listRecurringCostsRoute,
   POST as postRecurringCostRoute,
 } from "@/app/api/app/establishments/[establishmentId]/recurring-costs/route";
+import { DELETE as deactivateRecurringCostRoute } from "@/app/api/app/establishments/[establishmentId]/recurring-costs/[costId]/route";
 import {
   GET as getGoalRoute,
   POST as postGoalRoute,
@@ -256,6 +257,16 @@ export class TestClient {
     const request = this.buildRequest("GET", `/api/app/establishments/${establishmentId}/recurring-costs`);
     return this.capture(
       await listRecurringCostsRoute(request, { params: Promise.resolve({ establishmentId }) }),
+    );
+  }
+
+  async deactivateRecurringCost(
+    establishmentId: string,
+    costId: string,
+  ): Promise<ApiResponse<{ ok?: boolean; error?: unknown }>> {
+    const request = this.buildRequest("DELETE", `/api/app/establishments/${establishmentId}/recurring-costs/${costId}`);
+    return this.capture(
+      await deactivateRecurringCostRoute(request, { params: Promise.resolve({ establishmentId, costId }) }),
     );
   }
 

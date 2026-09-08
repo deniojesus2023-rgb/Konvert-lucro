@@ -63,6 +63,15 @@ export async function listRecurringCosts(db: Executor, establishmentId: string):
   return rows as RecurringCostRow[];
 }
 
-export async function deactivateRecurringCost(db: Executor, id: string): Promise<void> {
-  await db.update(recurringCosts).set({ active: false, updatedAt: new Date() }).where(eq(recurringCosts.id, id));
+/** True if a row for that establishment was actually deactivated. */
+export async function deactivateRecurringCost(
+  db: Executor,
+  input: { id: string; establishmentId: string },
+): Promise<boolean> {
+  const rows = await db
+    .update(recurringCosts)
+    .set({ active: false, updatedAt: new Date() })
+    .where(and(eq(recurringCosts.id, input.id), eq(recurringCosts.establishmentId, input.establishmentId)))
+    .returning({ id: recurringCosts.id });
+  return rows.length > 0;
 }

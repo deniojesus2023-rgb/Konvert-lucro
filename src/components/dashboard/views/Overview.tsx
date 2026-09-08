@@ -7,9 +7,20 @@ import { DatePickerButton } from "../shared";
 import { VendaForm } from "../forms/VendaForm";
 import { formatCurrencyDisplay } from "@/lib/client/currency";
 
+function parseValor(valor: string): number {
+  const digits = valor.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".");
+  return Number(digits) || 0;
+}
+
+function deltaLabel(current: number, previous: number): { text: string; up: boolean } | null {
+  if (previous === 0) return null;
+  const pct = Math.round(((current - previous) / previous) * 100);
+  return { text: `${pct >= 0 ? "▲" : "▼"} ${Math.abs(pct)}%`, up: pct >= 0 };
+}
+
 export function Overview({ isActive }: { isActive: boolean }) {
   const { goTo } = useDashboard();
-  const { summary, vendas, metas, profitGoalCents } = useDashboardData();
+  const { summary, previousSummary, vendas, custos, metas, profitGoalCents } = useDashboardData();
   const [formOpen, setFormOpen] = useState(false);
 
   const totalPedidos = vendas.reduce((sum, v) => sum + v.pedidos, 0);
@@ -17,6 +28,21 @@ export function Overview({ isActive }: { isActive: boolean }) {
   const lucroPorPedido = summary?.profitPerOrder.status === "available" ? summary.profitPerOrder.value : null;
   const margemPct = summary?.marginBps.status === "available" ? (summary.marginBps.value / 100).toFixed(0) : "—";
   const meta = metas[0];
+
+  const revenueDelta = previousSummary ? deltaLabel(summary?.netRevenueCents ?? 0, previousSummary.netRevenueCents) : null;
+  const previousLucro = previousSummary?.profit.status === "available" ? previousSummary.profit.value : 0;
+  const lucroDelta = previousSummary ? deltaLabel(lucro, previousLucro) : null;
+
+  const takeHomePct = summary?.takeHomePer100Cents.status === "available" ? summary.takeHomePer100Cents.value / 100 : null;
+  const custosPct = takeHomePct !== null ? 100 - takeHomePct : null;
+
+  const porCategoria = (() => {
+    const totals = new Map<string, number>();
+    for (const c of custos) totals.set(c.categoria, (totals.get(c.categoria) ?? 0) + parseValor(c.valor));
+    return [...totals.entries()].map(([categoria, total]) => ({ categoria, total })).sort((a, b) => b.total - a.total).slice(0, 4);
+  })();
+  const netRevenue = summary ? summary.netRevenueCents / 100 : 0;
+  const maiorCategoria = porCategoria[0];
 
   return (
     <section className={`view${isActive ? " active" : ""}`} id="view-overview">
@@ -97,9 +123,15 @@ export function Overview({ isActive }: { isActive: boolean }) {
         <div className="card stat-card">
           <div className="label">Vendas informadas</div>
           <div className="value">{summary ? formatCurrencyDisplay(summary.netRevenueCents) : "—"}</div>
-          <div className="sub" style={{ fontSize: 12.5 }}>
-            {totalPedidos.toLocaleString("pt-BR")} pedidos
-          </div>
+          {revenueDelta ? (
+            <div className={revenueDelta.up ? "delta up" : "delta down"}>
+              {revenueDelta.text} <span className="sub">vs. mês anterior</span>
+            </div>
+          ) : (
+            <div className="sub" style={{ fontSize: 12.5 }}>
+              {totalPedidos.toLocaleString("pt-BR")} pedidos
+            </div>
+          )}
         </div>
         <div className="card stat-card">
           <div className="label">Custos informados</div>
@@ -108,9 +140,15 @@ export function Overview({ isActive }: { isActive: boolean }) {
         <div className="card stat-card">
           <div className="label">Lucro estimado</div>
           <div className="value blue">{summary?.profit.status === "available" ? formatCurrencyDisplay(lucro) : "Indisponível"}</div>
-          <div className="sub" style={{ fontSize: 12.5 }}>
-            Margem de {margemPct === "—" ? "—" : `${margemPct}%`}
-          </div>
+          {lucroDelta ? (
+            <div className={lucroDelta.up ? "delta up" : "delta down"}>
+              {lucroDelta.text} <span className="sub">vs. mês anterior</span>
+            </div>
+          ) : (
+            <div className="sub" style={{ fontSize: 12.5 }}>
+              Margem de {margemPct === "—" ? "—" : `${margemPct}%`}
+            </div>
+          )}
         </div>
         <div className="card stat-card">
           <div className="label">Lucro por pedido</div>
@@ -125,25 +163,35 @@ export function Overview({ isActive }: { isActive: boolean }) {
         <div className="card section-block">
           <div className="section-title">Como suas vendas se dividem</div>
           <div className="section-sub">A cada R$100 vendidos</div>
-          <div className="split-bar">
-            <div className="seg-a" style={{ width: "80%" }}>
-              80%
-            </div>
-            <div className="seg-b" style={{ width: "20%" }}>
-              20%
-            </div>
-          </div>
-          <div className="legend-row">
-            <div className="legend-item">
-              <span className="sw" style={{ background: "var(--gray-bar)" }}></span>Custos <span className="amt">R$80</span>
-            </div>
-            <div className="legend-item">
-              <span className="sw" style={{ background: "var(--primary)" }}></span>Lucro estimado <span className="amt">R$20</span>
-            </div>
-          </div>
-          <div className="divider-line"></div>
-          <div style={{ fontWeight: 700, fontSize: 14.5, marginBottom: 2 }}>R$20 ficam no delivery a cada R$100 vendidos.</div>
-          <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>Com base nos custos informados.</div>
+          {custosPct !== null && takeHomePct !== null ? (
+            <>
+              <div className="split-bar">
+                <div className="seg-a" style={{ width: `${custosPct}%` }}>
+                  {Math.round(custosPct)}%
+                </div>
+                <div className="seg-b" style={{ width: `${takeHomePct}%` }}>
+                  {Math.round(takeHomePct)}%
+                </div>
+              </div>
+              <div className="legend-row">
+                <div className="legend-item">
+                  <span className="sw" style={{ background: "var(--gray-bar)" }}></span>Custos <span className="amt">R${custosPct.toFixed(0)}</span>
+                </div>
+                <div className="legend-item">
+                  <span className="sw" style={{ background: "var(--primary)" }}></span>Lucro estimado <span className="amt">R${takeHomePct.toFixed(0)}</span>
+                </div>
+              </div>
+              <div className="divider-line"></div>
+              <div style={{ fontWeight: 700, fontSize: 14.5, marginBottom: 2 }}>
+                R${takeHomePct.toFixed(0)} ficam no delivery a cada R$100 vendidos.
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>Com base nos custos informados.</div>
+            </>
+          ) : (
+            <p style={{ color: "var(--text-muted)", fontSize: 13.5, marginTop: 10 }}>
+              Lance vendas neste mês para ver essa divisão.
+            </p>
+          )}
         </div>
 
         <div className="card section-block">
@@ -195,38 +243,20 @@ export function Overview({ isActive }: { isActive: boolean }) {
               </tbody>
             </table>
             <div style={{ marginTop: 6 }}>
-              <div className="mini-bar-row">
-                <div className="cat">Produção e embalagens</div>
-                <div className="val">R$ 18.000,00</div>
-                <div className="mini-bar-track">
-                  <div className="mini-bar-fill" style={{ width: "36%" }}></div>
-                </div>
-                <div className="mini-bar-pct">36%</div>
-              </div>
-              <div className="mini-bar-row">
-                <div className="cat">Taxas das vendas</div>
-                <div className="val">R$ 8.000,00</div>
-                <div className="mini-bar-track">
-                  <div className="mini-bar-fill" style={{ width: "16%" }}></div>
-                </div>
-                <div className="mini-bar-pct">16%</div>
-              </div>
-              <div className="mini-bar-row">
-                <div className="cat">Entregas</div>
-                <div className="val">R$ 6.000,00</div>
-                <div className="mini-bar-track">
-                  <div className="mini-bar-fill" style={{ width: "12%" }}></div>
-                </div>
-                <div className="mini-bar-pct">12%</div>
-              </div>
-              <div className="mini-bar-row">
-                <div className="cat">Estrutura e impostos</div>
-                <div className="val">R$ 8.000,00</div>
-                <div className="mini-bar-track">
-                  <div className="mini-bar-fill" style={{ width: "16%" }}></div>
-                </div>
-                <div className="mini-bar-pct">16%</div>
-              </div>
+              {porCategoria.map((row) => {
+                const pctVendas = netRevenue > 0 ? Math.round((row.total / netRevenue) * 100) : 0;
+                return (
+                  <div className="mini-bar-row" key={row.categoria}>
+                    <div className="cat">{row.categoria}</div>
+                    <div className="val">R$ {row.total.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div className="mini-bar-track">
+                      <div className="mini-bar-fill" style={{ width: `${Math.min(100, pctVendas)}%` }}></div>
+                    </div>
+                    <div className="mini-bar-pct">{pctVendas}%</div>
+                  </div>
+                );
+              })}
+              {porCategoria.length === 0 && <p style={{ color: "var(--text-muted)", fontSize: 13.5 }}>Nenhuma despesa lançada neste mês.</p>}
             </div>
           </div>
         </div>
@@ -236,9 +266,14 @@ export function Overview({ isActive }: { isActive: boolean }) {
             Onde olhar primeiro
           </div>
           <h4>
-            <span className="callout-dot"></span>Produção e embalagens
+            <span className="callout-dot"></span>
+            {maiorCategoria?.categoria ?? "Sem despesas ainda"}
           </h4>
-          <p>É o maior custo informado no período. Confira os valores e procure oportunidades de redução.</p>
+          <p>
+            {maiorCategoria
+              ? "É o maior custo informado no período. Confira os valores e procure oportunidades de redução."
+              : "Lance suas despesas para ver onde olhar primeiro."}
+          </p>
           <span className="link" onClick={() => goTo("custos")}>
             Revisar custos →
           </span>
