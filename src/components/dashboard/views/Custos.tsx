@@ -227,7 +227,7 @@ export function Custos({ isActive }: { isActive: boolean }) {
             <div className="section-title" style={{ marginBottom: 10 }}>
               Distribuição dos custos
             </div>
-            <div className="donut-center" style={{ textAlign: "center", marginBottom: 10 }}>
+            <div style={{ textAlign: "center", marginBottom: 14 }}>
               <div className="amt">{totalCustos}</div>
               <div className="lbl">Total de despesas lançadas (mês)</div>
             </div>
